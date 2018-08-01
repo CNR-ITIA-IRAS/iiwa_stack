@@ -26,6 +26,7 @@ package de.tum.in.camp.kuka.ros;
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
+import org.ros.node.Node;
 import org.ros.node.topic.Publisher;
 
 import com.kuka.connectivity.motionModel.smartServo.SmartServo;
@@ -61,7 +62,7 @@ public class iiwaPublisher extends AbstractNodeMain {
 	private String iiwaName = "iiwa";
 
 	// Object to easily build iiwa_msgs from the current robot state
-	private iiwaMessageGenerator helper;
+	private MessageGenerator helper;
 	
 	private ConnectedNode node = null;
 
@@ -83,9 +84,9 @@ public class iiwaPublisher extends AbstractNodeMain {
 	 * 
 	 * @param robotName : name of the robot, topics will be created accordingly : <robot name>/state/<iiwa_msgs type> (e.g. MyIIWA/state/CartesianPosition)
 	 */
-	public iiwaPublisher(String robotName) {
+	public iiwaPublisher(String robotName, Configuration configuration) {
 		iiwaName = robotName;
-		helper = new iiwaMessageGenerator(iiwaName);
+		helper = new MessageGenerator(iiwaName, configuration);
 
 		cp = helper.buildMessage(geometry_msgs.PoseStamped._TYPE);
 		cw = helper.buildMessage(geometry_msgs.WrenchStamped._TYPE);
@@ -173,55 +174,73 @@ public class iiwaPublisher extends AbstractNodeMain {
 	 * @throws InterruptedException
 	 */
 	public void publishCurrentState(LBR robot, SmartServo motion, ObjectFrame frame) throws InterruptedException {
-		if (cartesianPosePublisher.getNumberOfSubscribers() > 0) {
-			helper.getCurrentCartesianPose(cp, robot, frame);
-			helper.incrementSeqNumber(cp.getHeader());
-			cartesianPosePublisher.publish(cp);
-		}
-		if (cartesianWrenchPublisher.getNumberOfSubscribers() > 0) {
-			helper.getCurrentCartesianWrench(cw, robot, frame);
-			helper.incrementSeqNumber(cw.getHeader());
-			cartesianWrenchPublisher.publish(cw);
-		}
-		if (jointPositionPublisher.getNumberOfSubscribers() > 0) {
-			helper.getCurrentJointPosition(jp, robot);
-			helper.incrementSeqNumber(jp.getHeader());
-			jointPositionPublisher.publish(jp);
-		}
-		if (jointPositionVelocityPublisher.getNumberOfSubscribers() > 0) {
-			helper.getCurrentJointPositionVelocity(jpv, robot);
-			helper.incrementSeqNumber(jpv.getHeader());
-			jointPositionVelocityPublisher.publish(jpv);
-		}
-		if (jointVelocityPublisher.getNumberOfSubscribers() > 0) {
-			helper.getCurrentJointVelocity(jv, robot);
-			helper.incrementSeqNumber(jv.getHeader());
-			jointVelocityPublisher.publish(jv);
-		}
-		if (jointTorquePublisher.getNumberOfSubscribers() > 0) {
-			helper.getCurrentJointTorque(jt, robot);
-			helper.incrementSeqNumber(jt.getHeader());
-			jointTorquePublisher.publish(jt);
-		}
+
+		boolean send_all = true;
 		
-		if (motion != null) {
-			if (jointStiffnessPublisher.getNumberOfSubscribers() > 0 && motion.getMode() instanceof JointImpedanceControlMode) {
-				helper.getCurrentJointStiffness(jst, robot, motion);
-				helper.incrementSeqNumber(jst.getHeader());
-				jointStiffnessPublisher.publish(jst);
+		if( !send_all )
+		{
+			if (cartesianPosePublisher.getNumberOfSubscribers() > 0) {
+				helper.getCurrentCartesianPose(cp, robot, frame);
+				helper.incrementSeqNumber(cp.getHeader());
+				cartesianPosePublisher.publish(cp);
 			}
-			if (jointDampingPublisher.getNumberOfSubscribers() > 0  && motion.getMode() instanceof JointImpedanceControlMode) {
-				helper.getCurrentJointDamping(jd, robot, motion);
+			if (cartesianWrenchPublisher.getNumberOfSubscribers() > 0) {
+				helper.getCurrentCartesianWrench(cw, robot, frame);
+				helper.incrementSeqNumber(cw.getHeader());
+				cartesianWrenchPublisher.publish(cw);
+			}
+			if (jointPositionPublisher.getNumberOfSubscribers() > 0) {
+				helper.getCurrentJointPosition(jp, robot);
 				helper.incrementSeqNumber(jp.getHeader());
-				jointDampingPublisher.publish(jd);
+				jointPositionPublisher.publish(jp);
+			}
+			if (jointPositionVelocityPublisher.getNumberOfSubscribers() > 0) {
+				helper.getCurrentJointPositionVelocity(jpv, robot);
+				helper.incrementSeqNumber(jpv.getHeader());
+				jointPositionVelocityPublisher.publish(jpv);
+			}
+			if (jointVelocityPublisher.getNumberOfSubscribers() > 0) {
+				helper.getCurrentJointVelocity(jv, robot);
+				helper.incrementSeqNumber(jv.getHeader());
+				jointVelocityPublisher.publish(jv);
+			}
+			if (jointTorquePublisher.getNumberOfSubscribers() > 0) {
+				helper.getCurrentJointTorque(jt, robot);
+				helper.incrementSeqNumber(jt.getHeader());
+				jointTorquePublisher.publish(jt);
+			}
+			
+			if (motion != null) {
+				if (jointStiffnessPublisher.getNumberOfSubscribers() > 0 && motion.getMode() instanceof JointImpedanceControlMode) {
+					helper.getCurrentJointStiffness(jst, robot, motion);
+					helper.incrementSeqNumber(jst.getHeader());
+					jointStiffnessPublisher.publish(jst);
+				}
+				if (jointDampingPublisher.getNumberOfSubscribers() > 0  && motion.getMode() instanceof JointImpedanceControlMode) {
+					helper.getCurrentJointDamping(jd, robot, motion);
+					helper.incrementSeqNumber(jp.getHeader());
+					jointDampingPublisher.publish(jd);
+				}
+			}
+			
+			if (publishJointState && jointStatesPublisher.getNumberOfSubscribers() > 0) {
+				helper.getCurrentJointState(js, robot);
+				helper.incrementSeqNumber(js.getHeader());
+				jointStatesPublisher.publish(js);
 			}
 		}
-		
-		if (publishJointState && jointStatesPublisher.getNumberOfSubscribers() > 0) {
-			helper.getCurrentJointState(js, robot);
-			helper.incrementSeqNumber(js.getHeader());
-			jointStatesPublisher.publish(js);
-		}		
+		else
+		{
+			helper.getCurrentRobotState(cp.getHeader(),cp,cw,jp,jpv,jv,jt,js,robot,robot.getFlange());
+			jointVelocityPublisher.publish(jv);
+			cartesianPosePublisher.publish(cp);
+			cartesianWrenchPublisher.publish(cw);
+			jointPositionPublisher.publish(jp);
+			jointPositionVelocityPublisher.publish(jpv);
+			jointTorquePublisher.publish(jt);
+			if (publishJointState)
+				jointStatesPublisher.publish(js);
+		}
 	}
 
 	/**
@@ -252,5 +271,15 @@ public class iiwaPublisher extends AbstractNodeMain {
 		final std_msgs.String msg = iiwaButtonPublisher.newMessage();
 		msg.setData(name + "_released");
 		iiwaButtonPublisher.publish(msg);
+	}
+	
+
+	@Override
+	public void onShutdown(Node node) {
+		
+		// TODO Auto-generated method stub
+		
+		
+		super.onShutdown(node);
 	}
 }
