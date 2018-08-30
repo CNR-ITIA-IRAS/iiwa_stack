@@ -6,7 +6,10 @@
     <!-- Load Gazebo lib and set the robot namespace -->
     <gazebo>
       <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
-        <robotNamespace>${robot_name}</robotNamespace>
+        <robotSimType>gazebo_ros_control/DefaultRobotHWSim</robotSimType>
+        <legacyModeNS>true</legacyModeNS>
+        <robotName>${robot_name}</robotName>
+        <robotNamespace>/${robot_name}/</robotNamespace>
         <robotParam>${robot_description_param}</robotParam>
       </plugin>
     </gazebo>
