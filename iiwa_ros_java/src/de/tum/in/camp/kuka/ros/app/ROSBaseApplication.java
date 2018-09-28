@@ -1,8 +1,8 @@
 /**  
  * Copyright (C) 2016-2017 Salvatore Virga - salvo.virga@tum.de, Marco Esposito - marco.esposito@tum.de
- * Technische Universität München
+ * Technische UniversitÃ¤t MÃ¼nchen
  * Chair for Computer Aided Medical Procedures and Augmented Reality
- * Fakultät für Informatik / I16, Boltzmannstraße 3, 85748 Garching bei München, Germany
+ * FakultÃ¤t fÃ¼r Informatik / I16, BoltzmannstraÃŸe 3, 85748 Garching bei MÃ¼nchen, Germany
  * http://campar.in.tum.de
  * All rights reserved.
  * 
@@ -27,6 +27,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.ros.address.BindAddress;
 import org.ros.node.DefaultNodeMainExecutor;
@@ -34,6 +35,9 @@ import org.ros.node.NodeConfiguration;
 import org.ros.node.NodeMainExecutor;
 import org.ros.time.NtpTimeProvider;
 
+import com.kuka.connectivity.fastRobotInterface.FRIConfiguration;
+import com.kuka.connectivity.fastRobotInterface.FRIJointOverlay;
+import com.kuka.connectivity.fastRobotInterface.FRISession;
 import com.kuka.common.ThreadUtil;
 import com.kuka.connectivity.motionModel.smartServo.SmartServo;
 import com.kuka.connectivity.motionModel.smartServoLIN.SmartServoLIN;
@@ -61,6 +65,7 @@ public abstract class ROSBaseApplication extends RoboticsAPIApplication {
 
 	protected LBR robot;
 	protected Tool tool;
+	private String _clientName;
 	protected String toolFrameID;
 	protected static final String toolFrameIDSuffix = "_link_ee";
 	protected ObjectFrame toolFrame;
@@ -218,6 +223,32 @@ public abstract class ROSBaseApplication extends RoboticsAPIApplication {
 		beforeControlLoop();
 
 		running = true;
+		
+		// configure and start FRI session
+        FRIConfiguration friConfiguration = FRIConfiguration.createRemoteConfiguration(robot, _clientName);
+        friConfiguration.setSendPeriodMilliSec(5);
+        friConfiguration.setReceiveMultiplier(1);
+
+        getLogger().info("Creating FRI connection to " + friConfiguration.getHostName());
+        getLogger().info("SendPeriod: " + friConfiguration.getSendPeriodMilliSec() + "ms |"
+                + " ReceiveMultiplier: " + friConfiguration.getReceiveMultiplier());
+
+        FRISession friSession = new FRISession(friConfiguration);
+        FRIJointOverlay jointOverlay = new FRIJointOverlay(friSession);
+
+        // wait until FRI session is ready to switch to command mode
+        try
+        {
+            friSession.await(10, TimeUnit.SECONDS);
+        }
+        catch (final TimeoutException e)
+        {
+            getLogger().error(e.getLocalizedMessage());
+            friSession.close();
+            return;
+        }
+
+        getLogger().info("FRI connection established.");
 
 		// The run loop
 		Logger.info("Starting the ROS control loop...");
@@ -235,6 +266,9 @@ public abstract class ROSBaseApplication extends RoboticsAPIApplication {
 		catch (Exception e) {
 			Logger.info("ROS control loop aborted. " + e.toString());
 		} finally {
+			// done
+	        friSession.close();
+	        
 			Logger.info("ROS control Ending Procedures.");
 			cleanedup = cleanup();
 			Logger.info("ROS control loop has ended. Application terminated.");

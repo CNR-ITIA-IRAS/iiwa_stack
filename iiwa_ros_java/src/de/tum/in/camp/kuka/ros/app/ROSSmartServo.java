@@ -64,6 +64,15 @@ public class ROSSmartServo extends ROSBaseApplication {
 
 	private CommandType lastCommandType = CommandType.JOINT_POSITION;
 	private Motions motions;
+	
+	public enum ControlType {
+		POSITION_CONTROL,
+		JOINT_IMPEDANCE,
+		CARTESIAN_IMPEDANCE,
+		DESIRED_FORCE,
+		SINE_PATTERN,
+		FRI_CONTROL
+	}
 
 	@Override
 	protected void configureNodes(URI uri) {
@@ -88,8 +97,14 @@ public class ROSSmartServo extends ROSBaseApplication {
 			public void build(ConfigureSmartServoRequest req, ConfigureSmartServoResponse res) throws ServiceException {
 				configureSmartServoLock.lock();
 				try {
+					
+					int control_mode = req.getControlMode( );
 					// TODO: reduce code duplication
-					if (lastCommandType == CommandType.CARTESIAN_POSE_LIN) { 
+					if (req.getControlMode( ) == 5 ) {
+						
+						
+					}
+					else if (lastCommandType == CommandType.CARTESIAN_POSE_LIN) { 
 						if (controlModeHandler.isSameControlMode(linearMotion.getMode(), req.getControlMode())) { // We can just change the parameters if the control strategy is the same.
 							if (!(linearMotion.getMode() instanceof PositionControlMode)) { // We are in PositioControlMode and the request was for the same mode, there are no parameters to change.
 								linearMotion.getRuntime().changeControlModeSettings(controlModeHandler.buildMotionControlMode(req));
@@ -255,8 +270,8 @@ public class ROSSmartServo extends ROSBaseApplication {
 					}
 					PoseStamped commandPosition = subscriber.getCartesianPoseLin();
 					motions.cartesianPositionLinMotion(linearMotion, commandPosition);
-          break;
-        }
+					break;
+				}
 				case CARTESIAN_VELOCITY: {
 					geometry_msgs.TwistStamped commandVelocity = subscriber.getCartesianVelocity();
 					motions.cartesianVelocityMotion(motion, commandVelocity, toolFrame);
