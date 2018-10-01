@@ -48,6 +48,7 @@ IIWA_HW::IIWA_HW(ros::NodeHandle nh)
   interface_type_.push_back("PositionJointInterface");
   interface_type_.push_back("EffortJointInterface");
   interface_type_.push_back("VelocityJointInterface");
+  interface_type_.push_back("PositionJointFRIInterface");
 }
 
 IIWA_HW::~IIWA_HW() {}
@@ -269,6 +270,19 @@ bool IIWA_HW::write(ros::Duration period) {
     else if (interface_ == interface_type_.at(2)) {
       // TODO
     }
+    else if (interface_ == interface_type_.at(3)) {
+      if (device_->joint_position_command == last_joint_position_command_)  // avoid sending the same joint command over and over
+        return 0;
+      
+      last_joint_position_command_ = device_->joint_position_command;
+      
+      // Building the message
+      vectorToIiwaMsgsJoint(device_->joint_position_command, command_joint_position_.position);
+      command_joint_position_.header.stamp = ros::Time::now();
+      
+      iiwa_ros_conn_.setJointPosition(command_joint_position_);
+    }
+
     
   } else if (delta.toSec() >= 10) {
     ROS_INFO_STREAM("No LBR IIWA is connected. Waiting for the robot to connect before writing ...");

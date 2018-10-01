@@ -1,9 +1,9 @@
 package de.tum.in.camp.kuka.ros;
 
-import iiwa_msgs.CartesianQuantity;
-import iiwa_msgs.ConfigureSmartServoRequest;
-import iiwa_msgs.JointQuantity;
-
+import com.kuka.connectivity.fastRobotInterface.ClientCommandMode;
+import com.kuka.connectivity.fastRobotInterface.FRIConfiguration;
+import com.kuka.connectivity.fastRobotInterface.FRIJointOverlay;
+import com.kuka.connectivity.fastRobotInterface.FRISession;
 import com.kuka.connectivity.motionModel.smartServo.ServoMotion;
 import com.kuka.connectivity.motionModel.smartServo.SmartServo;
 import com.kuka.connectivity.motionModel.smartServoLIN.SmartServoLIN;
@@ -11,12 +11,14 @@ import com.kuka.roboticsAPI.deviceModel.LBR;
 import com.kuka.roboticsAPI.geometricModel.CartDOF;
 import com.kuka.roboticsAPI.geometricModel.ObjectFrame;
 import com.kuka.roboticsAPI.geometricModel.Tool;
-import com.kuka.roboticsAPI.motionModel.controlModeModel.CartesianImpedanceControlMode;
-import com.kuka.roboticsAPI.motionModel.controlModeModel.CartesianSineImpedanceControlMode;
-import com.kuka.roboticsAPI.motionModel.controlModeModel.IMotionControlMode;
-import com.kuka.roboticsAPI.motionModel.controlModeModel.JointImpedanceControlMode;
-import com.kuka.roboticsAPI.motionModel.controlModeModel.PositionControlMode;
+import com.kuka.roboticsAPI.motionModel.controlModeModel.*;
 import com.kuka.task.ITaskLogger;
+import iiwa_msgs.CartesianQuantity;
+import iiwa_msgs.ConfigureSmartServoRequest;
+import iiwa_msgs.JointQuantity;
+
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public class ControlModeHandler {
 
@@ -36,6 +38,49 @@ public class ControlModeHandler {
 
 	private MessageGenerator helper;
 	private GoalReachedEventListener handler = new GoalReachedEventListener(publisher);
+
+	private String friClientName;
+    private int friCtrlSamplingTime;
+
+	private static FRIConfiguration friConfiguration = null;
+	private static FRISession friSession = null;
+	public  static FRIJointOverlay Overlay = null;
+
+	public enum ControlMode {
+		POSITION_CONTROL(0),
+		JOINT_IMPEDANCE(1),
+		CARTESIAN_IMPEDANCE(2),
+		DESIRED_FORCE(3),
+		SINE_PATTERN(4),
+		FRI_JOINT_POS_CONTROL(5),
+		FRI_JOINT_TORQUE_CONTROL(6);
+
+		private final int value;
+		ControlMode(int value) {
+			this.value = value;
+		}
+
+		public int getValue() {
+			return value;
+		}
+	}
+	public static ControlMode ToControlMode(int value)
+    {
+        ControlMode ret;
+        switch (value)
+        {
+            case 0: { ret = ControlMode.POSITION_CONTROL; break; }
+            case 1: { ret = ControlMode.JOINT_IMPEDANCE; break; }
+            case 2: { ret = ControlMode.CARTESIAN_IMPEDANCE; break; }
+            case 3: { ret = ControlMode.DESIRED_FORCE; break; }
+            case 4: { ret = ControlMode.SINE_PATTERN; break; }
+            case 5: { ret = ControlMode.FRI_JOINT_POS_CONTROL; break; }
+            case 6: { ret = ControlMode.FRI_JOINT_TORQUE_CONTROL; break; }
+            default:
+                ret = ControlMode.POSITION_CONTROL; break;
+        }
+        return ret;
+    }
 
 	public ControlModeHandler(LBR robot, Tool tool, ObjectFrame toolFrame, iiwaPublisher publisher, Configuration configuration) {
 		this.robot = robot;
@@ -105,6 +150,45 @@ public class ControlModeHandler {
 
 		switchMotion(motion, oldMotion);
 
+		if( request.getControlMode() == 5 || request.getControlMode() == 6 ) {
+
+            // configure and start FRI session
+            friConfiguration = FRIConfiguration.createRemoteConfiguration(robot, friClientName);
+            friConfiguration.setSendPeriodMilliSec(friCtrlSamplingTime);
+            friConfiguration.setReceiveMultiplier(1);
+
+            friSession = new FRISession(friConfiguration);
+
+            if ( request.getControlMode() == 5 )
+            {
+                Overlay = new FRIJointOverlay(friSession);
+            }
+            else if ( request.getControlMode() == 6  )
+            {
+                Overlay = new FRIJointOverlay(friSession, ClientCommandMode.TORQUE);
+            }
+            // wait until FRI session is ready to switch to command mode
+            try
+            {
+                friSession.await(10, TimeUnit.SECONDS);
+            }
+            catch (final TimeoutException e)
+            {
+                friSession.close();
+                friSession = null;
+                Overlay = null;
+            }
+
+        }
+        else
+        {
+            if( friSession != null ) {
+                friSession.close();
+                friSession = null;
+                Overlay = null;
+            }
+        }
+
 		return motion;		
 	}
 	
@@ -126,6 +210,12 @@ public class ControlModeHandler {
 		}
 
 		switchMotion(motion, oldMotion);
+
+        if( friSession != null ) {
+            friSession.close();
+            friSession = null;
+            Overlay = null;
+        }
 
 		return motion;		
 	}
@@ -159,7 +249,7 @@ public class ControlModeHandler {
 //		return motion;
 //	}
 
-	public SmartServoLIN switchSmartServoMotion(SmartServo motion, IMotionControlMode controlMode) { 
+	private SmartServoLIN switchSmartServoMotion(SmartServo motion, IMotionControlMode controlMode) {
 		SmartServo oldMotion = motion;
 
 		if (!(controlMode instanceof PositionControlMode)) {
@@ -173,7 +263,7 @@ public class ControlModeHandler {
 	}
 
 
-	public SmartServo switchSmartServoMotion(SmartServoLIN motion, IMotionControlMode controlMode) { 
+	private SmartServo switchSmartServoMotion(SmartServoLIN motion, IMotionControlMode controlMode) {
 		SmartServoLIN oldMotion = motion;
 
 		if (!(controlMode instanceof PositionControlMode)) {
@@ -189,7 +279,7 @@ public class ControlModeHandler {
 
 	// TODO: doc
 	@SuppressWarnings("rawtypes")
-	public void switchMotion(ServoMotion motion, ServoMotion oldMotion) {
+	private void switchMotion(ServoMotion motion, ServoMotion oldMotion) {
 		toolFrame.moveAsync(motion);
 		if (oldMotion != null) {
 			oldMotion.getRuntime().stopMotion();
@@ -343,48 +433,57 @@ public class ControlModeHandler {
 
 		switch (request.getControlMode()) {
 
-		case iiwa_msgs.ControlMode.POSITION_CONTROL: {
-			cm = new PositionControlMode(true);
-			break;
-		}
+            case iiwa_msgs.ControlMode.POSITION_CONTROL: {
+                cm = new PositionControlMode(true);
+                break;
+            }
 
-		case iiwa_msgs.ControlMode.JOINT_IMPEDANCE: {
-			cm = buildJointImpedanceControlMode(request);
-			break;
-		}
+            case iiwa_msgs.ControlMode.JOINT_IMPEDANCE: {
+                cm = buildJointImpedanceControlMode(request);
+                break;
+            }
 
-		case iiwa_msgs.ControlMode.CARTESIAN_IMPEDANCE: {
-			cm = buildCartesianImpedanceControlMode(request);
-			break;
-		}
+            case iiwa_msgs.ControlMode.CARTESIAN_IMPEDANCE: {
+                cm = buildCartesianImpedanceControlMode(request);
+                break;
+            }
 
-		case iiwa_msgs.ControlMode.DESIRED_FORCE : {
-			CartesianSineImpedanceControlMode cscm = new CartesianSineImpedanceControlMode();
-			CartDOF direction = selectDegreeOfFreedom(request.getDesiredForce().getCartesianDof());
+            case iiwa_msgs.ControlMode.DESIRED_FORCE : {
+                CartesianSineImpedanceControlMode cscm = new CartesianSineImpedanceControlMode();
+                CartDOF direction = selectDegreeOfFreedom(request.getDesiredForce().getCartesianDof());
 
-			if (direction != null && request.getDesiredForce().getDesiredStiffness() >= 0) {
-				cscm = CartesianSineImpedanceControlMode.createDesiredForce(direction, request.getDesiredForce().getDesiredForce(),  request.getDesiredForce().getDesiredStiffness());
-				addControlModeLimits(cscm, request.getLimits());
-				cm = cscm;
-			}
-			break;
-		}
+                if (direction != null && request.getDesiredForce().getDesiredStiffness() >= 0) {
+                    cscm = CartesianSineImpedanceControlMode.createDesiredForce(direction, request.getDesiredForce().getDesiredForce(),  request.getDesiredForce().getDesiredStiffness());
+                    addControlModeLimits(cscm, request.getLimits());
+                    cm = cscm;
+                }
+                break;
+            }
 
-		case iiwa_msgs.ControlMode.SINE_PATTERN : {
-			CartesianSineImpedanceControlMode cscm = new CartesianSineImpedanceControlMode();
-			CartDOF direction = selectDegreeOfFreedom(request.getSinePattern().getCartesianDof());
+            case iiwa_msgs.ControlMode.SINE_PATTERN : {
+                CartesianSineImpedanceControlMode cscm = new CartesianSineImpedanceControlMode();
+                CartDOF direction = selectDegreeOfFreedom(request.getSinePattern().getCartesianDof());
 
-			if (direction != null && request.getSinePattern().getFrequency() >= 0 && request.getSinePattern().getAmplitude() >= 0 && request.getSinePattern().getStiffness() >= 0) {
-				cscm = CartesianSineImpedanceControlMode.createSinePattern(direction, request.getSinePattern().getFrequency(), request.getSinePattern().getAmplitude(), request.getSinePattern().getStiffness());
-				addControlModeLimits(cscm, request.getLimits());
-				cm = cscm;
-			}
-			break;
-		}
+                if (direction != null && request.getSinePattern().getFrequency() >= 0 && request.getSinePattern().getAmplitude() >= 0 && request.getSinePattern().getStiffness() >= 0) {
+                    cscm = CartesianSineImpedanceControlMode.createSinePattern(direction, request.getSinePattern().getFrequency(), request.getSinePattern().getAmplitude(), request.getSinePattern().getStiffness());
+                    addControlModeLimits(cscm, request.getLimits());
+                    cm = cscm;
+                }
+                break;
+            }
+            case 5: {
+                cm = new PositionControlMode(true);
+                break;
+            }
+            case 6: {
+                cm = new PositionControlMode(true);
+                break;
+            }
 
-		default:				
-			logger.error("Control Mode not supported.");
-			throw new UnsupportedControlModeException();  // this should just not happen
+            default: {
+                logger.error("Control Mode not supported.");
+                throw new UnsupportedControlModeException();  // this should just not happen
+            }
 		}
 
 		if (cm != null) {
@@ -468,9 +567,25 @@ public class ControlModeHandler {
 		case iiwa_msgs.ControlMode.SINE_PATTERN:
 			roscmname = "CartesianSineImpedanceControlMode";
 			break;
+        case 5:
+            roscmname = "PositionControlMode";
+            break;
+        case 6:
+            roscmname = "PositionControlMode";
+            break;
 		}
 		String kukacmname = kukacm.getClass().getSimpleName();
 
 		return roscmname.equals(kukacmname);
 	}
+
+
+	public static void cleanup(LBR robot) {
+		robot.getController().getExecutionService().cancelAll();
+        if( friSession != null ) {
+            friSession.close();
+            friSession = null;
+            Overlay = null;
+        }
+    }
 }

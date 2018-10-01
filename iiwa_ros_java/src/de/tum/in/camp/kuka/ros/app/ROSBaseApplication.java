@@ -23,22 +23,8 @@
 
 package de.tum.in.camp.kuka.ros.app;
 
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import org.ros.address.BindAddress;
-import org.ros.node.DefaultNodeMainExecutor;
-import org.ros.node.NodeConfiguration;
-import org.ros.node.NodeMainExecutor;
-import org.ros.time.NtpTimeProvider;
-
-import com.kuka.connectivity.fastRobotInterface.FRIConfiguration;
-import com.kuka.connectivity.fastRobotInterface.FRIJointOverlay;
-import com.kuka.connectivity.fastRobotInterface.FRISession;
 import com.kuka.common.ThreadUtil;
+import com.kuka.connectivity.motionModel.directServo.DirectServo;
 import com.kuka.connectivity.motionModel.smartServo.SmartServo;
 import com.kuka.connectivity.motionModel.smartServoLIN.SmartServoLIN;
 import com.kuka.roboticsAPI.applicationModel.RoboticsAPIApplication;
@@ -49,12 +35,15 @@ import com.kuka.roboticsAPI.geometricModel.Tool;
 import com.kuka.roboticsAPI.uiModel.userKeys.IUserKey;
 import com.kuka.roboticsAPI.uiModel.userKeys.IUserKeyBar;
 import com.kuka.roboticsAPI.uiModel.userKeys.IUserKeyListener;
+import de.tum.in.camp.kuka.ros.*;
+import org.ros.address.BindAddress;
+import org.ros.node.DefaultNodeMainExecutor;
+import org.ros.node.NodeConfiguration;
+import org.ros.node.NodeMainExecutor;
 
-import de.tum.in.camp.kuka.ros.ControlModeHandler;
-import de.tum.in.camp.kuka.ros.GoalReachedEventListener;
-import de.tum.in.camp.kuka.ros.Configuration;
-import de.tum.in.camp.kuka.ros.iiwaPublisher;
-import de.tum.in.camp.kuka.ros.Logger;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 
 /*
  * Base application for all ROS-Sunrise applications. 
@@ -65,12 +54,13 @@ public abstract class ROSBaseApplication extends RoboticsAPIApplication {
 
 	protected LBR robot;
 	protected Tool tool;
-	private String _clientName;
 	protected String toolFrameID;
 	protected static final String toolFrameIDSuffix = "_link_ee";
 	protected ObjectFrame toolFrame;
-	protected SmartServo motion;
+	protected SmartServo 	smartMotion;
 	protected SmartServoLIN linearMotion;
+	protected DirectServo directMotion;
+	
 	protected ControlModeHandler controlModeHandler;
 	protected GoalReachedEventListener handler;
 
@@ -110,6 +100,7 @@ public abstract class ROSBaseApplication extends RoboticsAPIApplication {
 	protected int controlDecimation = 1;
 
 	public void initialize() {
+		
 		Logger.setSunriseLogger(getLogger());
 		
 		robot = getContext().getDeviceFromType(LBR.class);
@@ -206,58 +197,30 @@ public abstract class ROSBaseApplication extends RoboticsAPIApplication {
 		}
 
 		controlModeHandler = new ControlModeHandler(robot, tool, toolFrame, publisher, configuration);
-		motion = controlModeHandler.createSmartServoMotion();
+		smartMotion = controlModeHandler.createSmartServoMotion();
+
 		// Publish joint state?
 		publisher.setPublishJointStates(configuration.getPublishJointStates());
 
-		// Initialize motion.
-		toolFrame.moveAsync(motion);
-		// Hook the GoalReachedEventHandler
-		motion.getRuntime().setGoalReachedEventHandler(handler);
-
-		if (configuration.getTimeProvider() instanceof org.ros.time.NtpTimeProvider) {
-			((NtpTimeProvider) configuration.getTimeProvider()).startPeriodicUpdates(100, TimeUnit.MILLISECONDS); // TODO: update time as param
-		}
-
 		// Run what is needed before the control loop in the subclasses.
+		Logger.info("Doing beforeControlLoop...");
 		beforeControlLoop();
+		Logger.info("beforeControlLoop Done!");
 
 		running = true;
 		
-		// configure and start FRI session
-        FRIConfiguration friConfiguration = FRIConfiguration.createRemoteConfiguration(robot, _clientName);
-        friConfiguration.setSendPeriodMilliSec(5);
-        friConfiguration.setReceiveMultiplier(1);
-
-        getLogger().info("Creating FRI connection to " + friConfiguration.getHostName());
-        getLogger().info("SendPeriod: " + friConfiguration.getSendPeriodMilliSec() + "ms |"
-                + " ReceiveMultiplier: " + friConfiguration.getReceiveMultiplier());
-
-        FRISession friSession = new FRISession(friConfiguration);
-        FRIJointOverlay jointOverlay = new FRIJointOverlay(friSession);
-
-        // wait until FRI session is ready to switch to command mode
-        try
-        {
-            friSession.await(10, TimeUnit.SECONDS);
-        }
-        catch (final TimeoutException e)
-        {
-            getLogger().error(e.getLocalizedMessage());
-            friSession.close();
-            return;
-        }
-
-        getLogger().info("FRI connection established.");
+		
 
 		// The run loop
 		Logger.info("Starting the ROS control loop...");
+		
 		try {
 			while(running) { 
+				
 				decimationCounter++;
 
 				// This will publish the current robot state on the various ROS topics.
-				publisher.publishCurrentState(robot, motion, toolFrame);
+				publisher.publishCurrentState(robot, smartMotion, toolFrame);
 
 				if ((decimationCounter % controlDecimation) == 0)
 					controlLoop();  // Perform control loop specified by subclass
@@ -265,10 +228,7 @@ public abstract class ROSBaseApplication extends RoboticsAPIApplication {
 		}
 		catch (Exception e) {
 			Logger.info("ROS control loop aborted. " + e.toString());
-		} finally {
-			// done
-	        friSession.close();
-	        
+		} finally {	        
 			Logger.info("ROS control Ending Procedures.");
 			cleanedup = cleanup();
 			Logger.info("ROS control loop has ended. Application terminated.");
@@ -302,7 +262,7 @@ public abstract class ROSBaseApplication extends RoboticsAPIApplication {
 		super.onApplicationStateChanged(state);
 	};
 
-	boolean cleanup() {
+	protected boolean cleanup() {
 		running = false;
 		if (nodeMainExecutor != null) {
 			Logger.info("Stopping ROS nodes");

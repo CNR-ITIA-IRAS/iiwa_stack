@@ -1,12 +1,12 @@
 package de.tum.in.camp.kuka.ros;
 
-import geometry_msgs.PoseStamped;
 import com.kuka.connectivity.motionModel.smartServo.SmartServo;
 import com.kuka.connectivity.motionModel.smartServoLIN.SmartServoLIN;
 import com.kuka.roboticsAPI.deviceModel.JointPosition;
 import com.kuka.roboticsAPI.deviceModel.LBR;
 import com.kuka.roboticsAPI.geometricModel.Frame;
 import com.kuka.roboticsAPI.geometricModel.ObjectFrame;
+import geometry_msgs.PoseStamped;
 
 public class Motions {
 

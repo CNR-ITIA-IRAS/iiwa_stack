@@ -1,8 +1,8 @@
 /**  
  * Copyright (C) 2016-2017 Salvatore Virga - salvo.virga@tum.de, Marco Esposito - marco.esposito@tum.de
- * Technische Universität München
+ * Technische Universitï¿½t Mï¿½nchen
  * Chair for Computer Aided Medical Procedures and Augmented Reality
- * Fakultät für Informatik / I16, Boltzmannstraße 3, 85748 Garching bei München, Germany
+ * Fakultï¿½t fï¿½r Informatik / I16, Boltzmannstraï¿½e 3, 85748 Garching bei Mï¿½nchen, Germany
  * http://campar.in.tum.de
  * All rights reserved.
  * 
@@ -23,24 +23,8 @@
 
 package de.tum.in.camp.kuka.ros;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Semaphore;
-
+import com.kuka.roboticsAPI.uiModel.IApplicationUI;
+import com.kuka.roboticsAPI.uiModel.userKeys.*;
 import org.ros.exception.ParameterNotFoundException;
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
@@ -50,12 +34,15 @@ import org.ros.time.NtpTimeProvider;
 import org.ros.time.TimeProvider;
 import org.ros.time.WallTimeProvider;
 
-import com.kuka.roboticsAPI.uiModel.IApplicationUI;
-import com.kuka.roboticsAPI.uiModel.userKeys.IUserKey;
-import com.kuka.roboticsAPI.uiModel.userKeys.IUserKeyBar;
-import com.kuka.roboticsAPI.uiModel.userKeys.IUserKeyListener;
-import com.kuka.roboticsAPI.uiModel.userKeys.UserKeyAlignment;
-import com.kuka.roboticsAPI.uiModel.userKeys.UserKeyEvent;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
 
 /**
  * Utility class to get configuration at startup from the config.txt file or from ROS params in the ROS param server.

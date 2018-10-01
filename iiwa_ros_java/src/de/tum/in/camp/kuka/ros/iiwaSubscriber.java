@@ -23,6 +23,8 @@
 
 package de.tum.in.camp.kuka.ros;
 
+import com.kuka.roboticsAPI.deviceModel.LBR;
+import com.kuka.roboticsAPI.geometricModel.ObjectFrame;
 import org.ros.message.MessageListener;
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
@@ -31,9 +33,6 @@ import org.ros.node.Node;
 import org.ros.node.service.ServiceResponseBuilder;
 import org.ros.node.service.ServiceServer;
 import org.ros.node.topic.Subscriber;
-
-import com.kuka.roboticsAPI.deviceModel.LBR;
-import com.kuka.roboticsAPI.geometricModel.ObjectFrame;
 
 /**
  * This class provides ROS subscribers for ROS messages defined in the iiwa_msgs ROS package.
