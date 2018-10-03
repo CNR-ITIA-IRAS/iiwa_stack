@@ -23,6 +23,8 @@
 
 package de.tum.in.camp.kuka.ros.app;
 
+import static com.kuka.roboticsAPI.motionModel.BasicMotions.ptp;
+
 import com.kuka.common.ThreadUtil;
 import com.kuka.roboticsAPI.deviceModel.LBR;
 import com.kuka.roboticsAPI.motionModel.IMotionContainer;
@@ -82,52 +84,59 @@ public class ROSSmartServo extends ROSBaseApplication {
 		subscriber.setConfigureSmartServoCallback(new ServiceResponseBuilder<iiwa_msgs.ConfigureSmartServoRequest, iiwa_msgs.ConfigureSmartServoResponse>() {
 			@Override
 			public void build(ConfigureSmartServoRequest req, ConfigureSmartServoResponse res) throws ServiceException {
-				configureSmartServoLock.lock();
-				try {
+				
+				int trials = 0;
+				while (trials < 3)
+				{
+					configureSmartServoLock.lock();
+					
+					try {
+						trials++;
+						act_control_mode = ControlModeHandler.ToControlMode( req.getControlMode( ) );
+						Logger.info(Integer.toString(req.getControlMode( )));
 
-					act_control_mode = ControlModeHandler.ToControlMode( req.getControlMode( ) );
-					// TODO: reduce code duplication
-					if (act_control_mode == ControlModeHandler.ControlMode.FRI_JOINT_POS_CONTROL || act_control_mode == ControlModeHandler.ControlMode.FRI_JOINT_TORQUE_CONTROL  ) {
-						if (controlModeHandler.isSameControlMode(smartMotion.getMode(), ControlModeHandler.ControlMode.POSITION_CONTROL.getValue() )) { // We can just change the parameters if the control strategy is the same.
-							if (!(smartMotion.getMode() instanceof PositionControlMode)) { // We are in PositioControlMode and the request was for the same mode, there are no parameters to change.
-								smartMotion.getRuntime().changeControlModeSettings(controlModeHandler.buildMotionControlMode(req));
+						if (lastCommandType == CommandType.CARTESIAN_POSE_LIN) {
+							if (controlModeHandler.isSameControlMode(linearMotion.getMode(), act_control_mode.getValue() )) { // We can just change the parameters if the control strategy is the same.
+								if (!(linearMotion.getMode() instanceof PositionControlMode)) { // We are in PositioControlMode and the request was for the same mode, there are no parameters to change.
+									linearMotion.getRuntime().changeControlModeSettings(controlModeHandler.buildMotionControlMode(req));
+								}
+							} else {
+								linearMotion = controlModeHandler.switchSmartServoMotion(linearMotion, req);
 							}
-						} else {
+						}
+						else {
+							//						Logger.info("inside else");
+							//						Logger.info(Integer.toString(act_control_mode.getValue()));
+							//						Logger.info( smartMotion.getMode().getClass().getSimpleName() );
+							//						if (controlModeHandler.isSameControlMode(smartMotion.getMode(), act_control_mode.getValue() )) { // We can just change the parameters if the control strategy is the same.
+							//							if (!(smartMotion.getMode() instanceof PositionControlMode)) { // We are in PositioControlMode and the request was for the same mode, there are no parameters to change.
+							//								Logger.info("ifif");
+							//								smartMotion.getRuntime().changeControlModeSettings(controlModeHandler.buildMotionControlMode(req));
+							//							}
+							//							else
+							//								Logger.info("uffa");
+							//						} else {
+							//							Logger.info("else");
 							smartMotion = controlModeHandler.switchSmartServoMotion(smartMotion, req);
+							//						}
 						}
-					}
-					else if (lastCommandType == CommandType.CARTESIAN_POSE_LIN) {
-						if (controlModeHandler.isSameControlMode(linearMotion.getMode(), act_control_mode.getValue() )) { // We can just change the parameters if the control strategy is the same.
-							if (!(linearMotion.getMode() instanceof PositionControlMode)) { // We are in PositioControlMode and the request was for the same mode, there are no parameters to change.
-								linearMotion.getRuntime().changeControlModeSettings(controlModeHandler.buildMotionControlMode(req));
-							}
-						} else {
-							linearMotion = controlModeHandler.switchSmartServoMotion(linearMotion, req);
-						}
-					}
-					else {
 
-						if (controlModeHandler.isSameControlMode(smartMotion.getMode(), act_control_mode.getValue() )) { // We can just change the parameters if the control strategy is the same.
-							if (!(smartMotion.getMode() instanceof PositionControlMode)) { // We are in PositioControlMode and the request was for the same mode, there are no parameters to change.
-								smartMotion.getRuntime().changeControlModeSettings(controlModeHandler.buildMotionControlMode(req));
-							}
+						res.setSuccess(true);
+						controlModeHandler.setLastSmartServoRequest(req);
+						break;
+					} catch (Exception e) {
+						ControlModeHandler.cleanup(robot);
+						res.setSuccess(false);
+						if (e.getMessage() != null) {
+							res.setError(e.getClass().getName() + ": " + e.getMessage());
+							Logger.error(e.getClass().getName() + ": " + e.getMessage());
 						} else {
-							smartMotion = controlModeHandler.switchSmartServoMotion(smartMotion, req);
+							res.setError("because I hate you :)");
 						}
 					}
-
-					res.setSuccess(true);
-					controlModeHandler.setLastSmartServoRequest(req);
-				} catch (Exception e) {
-					res.setSuccess(false);
-					if (e.getMessage() != null) {
-						res.setError(e.getClass().getName() + ": " + e.getMessage());
-					} else {
-						res.setError("because I hate you :)");
+					finally {
+						configureSmartServoLock.unlock();
 					}
-				}
-				finally {
-					configureSmartServoLock.unlock();
 				}
 			}
 		});
@@ -243,9 +252,6 @@ public class ROSSmartServo extends ROSBaseApplication {
 
     	motions = new Motions(robot, smartMotion);
 
-    	getLogger().info("FRI connection established.");
-
-
     	// Initialize smartMotion.
     	toolFrame.moveAsync(smartMotion);
     	// Hook the GoalReachedEventHandler
@@ -265,24 +271,65 @@ public class ROSSmartServo extends ROSBaseApplication {
     */
     private void moveRobot() {
 
-    	if (act_control_mode == ControlModeHandler.ControlMode.FRI_JOINT_POS_CONTROL || act_control_mode == ControlModeHandler.ControlMode.FRI_JOINT_TORQUE_CONTROL  ) {
-
+    	if (act_control_mode == ControlModeHandler.ControlMode.FRI_JOINT_POS_CONTROL ) {
+    		
     		if( pos_hold_container == null)
     		{
+    			getLogger().info("set pos hold...");
+    			
+    			robot.getController().getExecutionService().cancelAll();
+    			
 				PositionControlMode pos_control_mode = null;
 				PositionHold pos_hold = null;
 
 				pos_control_mode = new PositionControlMode();
 				pos_hold = new PositionHold(pos_control_mode, -1, null);
-				smartMotion.getRuntime().setDestination( robot.getCurrentJointPosition( ) );
+				robot.move(ptp(robot.getCurrentJointPosition()));
 				pos_hold_container = robot.moveAsync(pos_hold.addMotionOverlay(ControlModeHandler.Overlay));
-			}
-			ThreadUtil.milliSleep(5);
+			
+				getLogger().info("pos hold ok!");
+				
+				ThreadUtil.milliSleep(500);
+    		}
+    		
+//    		getLogger().error(robot.getCurrentJointPosition().toString());
+//    		getLogger().error(robot.getCommandedJointPosition().toString());
+//    		getLogger().error("------------------------");
+//    		
+//    		ThreadUtil.milliSleep(500);
+			
+		}
+    	else if ( act_control_mode == ControlModeHandler.ControlMode.FRI_JOINT_TORQUE_CONTROL || act_control_mode == ControlModeHandler.ControlMode.FRI_JOINT_IMP_CONTROL ) {
+    		
+    		if( pos_hold_container == null)
+    		{
+    			getLogger().info("set pos hold...");
+    			
+    			robot.getController().getExecutionService().cancelAll();
+    			
+				PositionHold pos_hold = null;
+
+				pos_hold = new PositionHold(smartMotion.getMode(), -1, null);
+				robot.move(ptp(robot.getCurrentJointPosition()));
+				pos_hold_container = robot.moveAsync(pos_hold.addMotionOverlay(ControlModeHandler.Overlay));
+			
+				getLogger().info("pos hold ok!");
+				
+				ThreadUtil.milliSleep(500);
+    		}
+    		
+//    		getLogger().error(robot.getCurrentJointPosition().toString());
+//    		getLogger().error(robot.getCommandedJointPosition().toString());
+//    		getLogger().error("------------------------");
+//    		
+//    		ThreadUtil.milliSleep(500);
+			
 		}
 		else if (subscriber.currentCommandType != null) {
 			if( pos_hold_container != null )
 			{
 				pos_hold_container.cancel();
+				pos_hold_container = null;
 			}
     		try {
 				switch (subscriber.currentCommandType) {

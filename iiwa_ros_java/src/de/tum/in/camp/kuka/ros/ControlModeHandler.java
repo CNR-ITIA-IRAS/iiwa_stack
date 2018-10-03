@@ -39,8 +39,8 @@ public class ControlModeHandler {
 	private MessageGenerator helper;
 	private GoalReachedEventListener handler = new GoalReachedEventListener(publisher);
 
-	private String friClientName;
-    private int friCtrlSamplingTime;
+	private String friClientName = "192.170.1.145";
+    private int friCtrlSamplingTime = 5;
 
 	private static FRIConfiguration friConfiguration = null;
 	private static FRISession friSession = null;
@@ -53,7 +53,8 @@ public class ControlModeHandler {
 		DESIRED_FORCE(3),
 		SINE_PATTERN(4),
 		FRI_JOINT_POS_CONTROL(5),
-		FRI_JOINT_TORQUE_CONTROL(6);
+		FRI_JOINT_TORQUE_CONTROL(6),
+		FRI_JOINT_IMP_CONTROL(7);
 
 		private final int value;
 		ControlMode(int value) {
@@ -76,6 +77,7 @@ public class ControlModeHandler {
             case 4: { ret = ControlMode.SINE_PATTERN; break; }
             case 5: { ret = ControlMode.FRI_JOINT_POS_CONTROL; break; }
             case 6: { ret = ControlMode.FRI_JOINT_TORQUE_CONTROL; break; }
+            case 7: { ret = ControlMode.FRI_JOINT_IMP_CONTROL; break; }
             default:
                 ret = ControlMode.POSITION_CONTROL; break;
         }
@@ -132,6 +134,9 @@ public class ControlModeHandler {
 //	}
 	
 	public SmartServo switchSmartServoMotion(SmartServo motion, iiwa_msgs.ConfigureSmartServoRequest request) {
+		
+		cleanup(robot);
+		
 		SmartServo oldMotion = motion;
 
 		validateForImpedanceMode();
@@ -150,16 +155,17 @@ public class ControlModeHandler {
 
 		switchMotion(motion, oldMotion);
 
-		if( request.getControlMode() == 5 || request.getControlMode() == 6 ) {
+		if( request.getControlMode() == 5 || request.getControlMode() == 6 || request.getControlMode() == 7 ) {
 
             // configure and start FRI session
-            friConfiguration = FRIConfiguration.createRemoteConfiguration(robot, friClientName);
-            friConfiguration.setSendPeriodMilliSec(friCtrlSamplingTime);
-            friConfiguration.setReceiveMultiplier(1);
+			
+			friConfiguration = FRIConfiguration.createRemoteConfiguration(robot, friClientName);
+			friConfiguration.setSendPeriodMilliSec(friCtrlSamplingTime);
+			friConfiguration.setReceiveMultiplier(1);
 
             friSession = new FRISession(friConfiguration);
 
-            if ( request.getControlMode() == 5 )
+            if ( request.getControlMode() == 5 || request.getControlMode() == 7 )
             {
                 Overlay = new FRIJointOverlay(friSession);
             }
@@ -170,22 +176,19 @@ public class ControlModeHandler {
             // wait until FRI session is ready to switch to command mode
             try
             {
+            	Logger.info("provo a connettere...");
+            	
                 friSession.await(10, TimeUnit.SECONDS);
+                
+                Logger.info("connection ok");
             }
             catch (final TimeoutException e)
             {
                 friSession.close();
                 friSession = null;
                 Overlay = null;
-            }
-
-        }
-        else
-        {
-            if( friSession != null ) {
-                friSession.close();
-                friSession = null;
-                Overlay = null;
+                
+                Logger.error("uffa FRI!");
             }
         }
 
@@ -476,7 +479,11 @@ public class ControlModeHandler {
                 break;
             }
             case 6: {
-                cm = new PositionControlMode(true);
+            	cm = buildJointImpedanceControlMode(request);
+                break;
+            }
+            case 7: {
+            	cm = buildJointImpedanceControlMode(request);
                 break;
             }
 
@@ -571,7 +578,10 @@ public class ControlModeHandler {
             roscmname = "PositionControlMode";
             break;
         case 6:
-            roscmname = "PositionControlMode";
+            roscmname = "JointImpedanceControlMode";
+            break;
+        case 7:
+            roscmname = "JointImpedanceControlMode";
             break;
 		}
 		String kukacmname = kukacm.getClass().getSimpleName();
@@ -581,11 +591,13 @@ public class ControlModeHandler {
 
 
 	public static void cleanup(LBR robot) {
+		Logger.info("kill the goal");
 		robot.getController().getExecutionService().cancelAll();
         if( friSession != null ) {
             friSession.close();
             friSession = null;
             Overlay = null;
         }
+        Logger.info("FRI killed!");
     }
 }
