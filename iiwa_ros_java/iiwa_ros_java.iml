@@ -7,7 +7,7 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="KUKAJavaLib" level="project" />
     <orderEntry type="library" name="ROSJavaLib" level="project" />
+    <orderEntry type="library" name="KUKAJavaLib" level="project" />
   </component>
 </module>

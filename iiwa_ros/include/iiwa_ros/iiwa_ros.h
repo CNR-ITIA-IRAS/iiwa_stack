@@ -23,6 +23,13 @@
 
 #pragma once
 
+#ifdef ENABLE_FRI
+  #include <iiwa_fri/friUdpConnection.h>
+  #include <iiwa_fri/friClientApplication.h>
+  #include <iiwa_fri/friLBRClient.h>
+  #include <realtime_utilities/circular_buffer.h>
+#endif
+
 #include <iiwa_msgs/CartesianVelocity.h>
 #include <iiwa_msgs/JointPosition.h>
 #include <iiwa_msgs/JointStiffness.h>
@@ -33,15 +40,16 @@
 #include <std_msgs//Time.h>
 #include <geometry_msgs/WrenchStamped.h>
 #include <geometry_msgs/PoseStamped.h>
-#include <smart_servo_service.h>
-#include <path_parameters_service.h>
-#include <time_to_destination_service.h>
+#include <iiwa_ros/servo_motion_service.h>
+#include <iiwa_ros/path_parameters_service.h>
+#include <iiwa_ros/time_to_destination_service.h>
 #include <ros/ros.h>
 
 #include <string>
 #include <mutex>
 
-namespace iiwa_ros {
+namespace iiwa_ros 
+{
   
   extern ros::Time last_update_time;
   
@@ -135,6 +143,9 @@ namespace iiwa_ros {
     iiwaHolder<ROSMSG> holder;
   };
   
+
+  
+  
   class iiwaRos {
   public:
     
@@ -217,9 +228,9 @@ namespace iiwa_ros {
     /**
      * @brief Returns the object that allows to call the configureSmartServo service.
      * 
-     * @return iiwa_ros::SmartServoService
+     * @return iiwa_ros::ServoMotion
      */
-    SmartServoService getSmartServoService() { return smart_servo_service_; }
+    ServoMotion& getServoMotion() { return servo_motion_service_; }
     
     /**
      * @brief Returns the object that allows to call the timeToDestination service.
@@ -234,6 +245,7 @@ namespace iiwa_ros {
      * @return iiwa_ros::TimeToDestinationService
      */
     TimeToDestinationService getTimeToDestinationService() { return time_to_destination_service_; };
+    
     
     /**
      * @brief Set the cartesian pose of the robot.
@@ -288,9 +300,11 @@ namespace iiwa_ros {
     iiwaCommandHolder<iiwa_msgs::JointVelocity> holder_command_joint_velocity_;
     iiwaCommandHolder<iiwa_msgs::JointPositionVelocity> holder_command_joint_position_velocity_;
     
-    SmartServoService smart_servo_service_;
+    ServoMotion servo_motion_service_;
     PathParametersService path_parameters_service_;
     TimeToDestinationService time_to_destination_service_;
+
+    
   };
   
 }

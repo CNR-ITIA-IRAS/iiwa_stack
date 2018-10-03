@@ -3,6 +3,15 @@ project(iiwa_hw)
 
 set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
 
+option( ENABLE_FRI "Enable the FRI client" ON )
+
+if( ENABLE_FRI )
+  set( CMAKE_POSITION_INDEPENDENT_CODE ON)
+  add_definitions( -DENABLE_FRI )
+  SET( KUKA_FRI_LIBRARIES FRIClient )
+  SET( KUKA_FRI_INCLUDE  /usr/local/include )
+endif()
+
 find_package(catkin REQUIRED COMPONENTS
   control_toolbox
   controller_interface
@@ -18,17 +27,17 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 catkin_package(
-	INCLUDE_DIRS include
-	LIBRARIES	 ${PROJECT_NAME}
-	CATKIN_DEPENDS  controller_interface
-			hardware_interface
-			control_toolbox
+  INCLUDE_DIRS include
+  LIBRARIES	 ${PROJECT_NAME}
+  CATKIN_DEPENDS  controller_interface
+                  hardware_interface
+                  control_toolbox
 )
 
 ## Specify additional locations of header files
-include_directories(include
-  ${Boost_INCLUDE_DIR}
-  ${catkin_INCLUDE_DIRS}
+include_directories(include ${Boost_INCLUDE_DIR}
+                            ${catkin_INCLUDE_DIRS}
+                            ${KUKA_FRI_INCLUDE} 
 )
 
 ## Declare a cpp library
@@ -37,25 +46,17 @@ add_library(${PROJECT_NAME}
   src/iiwa_hw.cpp
 )
 
-target_link_libraries(${PROJECT_NAME}
-    ${catkin_LIBRARIES}
-)
+## Add dependence to the iiwa_msg module for the library
+add_dependencies(${PROJECT_NAME}        iiwa_msgs_generate_messages_cpp)
 
 ## Declare a cpp executable
-add_executable(${PROJECT_NAME}-bin
-    src/main.cpp
-)
+add_executable(${PROJECT_NAME}-bin  src/main.cpp  )
 
 ## Add dependence to the iiwa_msg module for the executable
-add_dependencies(${PROJECT_NAME}-bin
-				iiwa_msgs_generate_messages_cpp)
-				
-## Add dependence to the iiwa_msg module for the library
-add_dependencies(${PROJECT_NAME}
-				iiwa_msgs_generate_messages_cpp)
+add_dependencies(${PROJECT_NAME}-bin    iiwa_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(${PROJECT_NAME}-bin
-    ${PROJECT_NAME}
-    ${catkin_LIBRARIES}
+target_link_libraries(${PROJECT_NAME}-bin ${PROJECT_NAME} 
+                                          ${catkin_LIBRARIES}
+                                          ${KUKA_FRI_LIBRARIES}
 )

@@ -51,7 +51,10 @@ IIWA_HW::IIWA_HW(ros::NodeHandle nh)
   interface_type_.push_back("PositionJointFRIInterface");
 }
 
-IIWA_HW::~IIWA_HW() {}
+IIWA_HW::~IIWA_HW() 
+{
+  
+}
 
 ros::Rate* IIWA_HW::getRate() {
   return loop_rate_;

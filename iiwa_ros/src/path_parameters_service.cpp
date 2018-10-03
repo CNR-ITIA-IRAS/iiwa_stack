@@ -21,7 +21,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <path_parameters_service.h>
+#include <iiwa_ros/path_parameters_service.h>
 
 namespace iiwa_ros {
   
@@ -37,7 +37,10 @@ namespace iiwa_ros {
           ROS_ERROR_STREAM(service_name_ << " failed, Java error: " << service_error_);
         }
         else if (verbose_) {
+          
           ROS_INFO_STREAM(ros::this_node::getName() << ":" << service_name_ << " successfully called.");
+          ROS_INFO_STREAM(config_.request);
+          ROS_INFO_STREAM("-----------------------");
         }
       }
       else if (verbose_) {
