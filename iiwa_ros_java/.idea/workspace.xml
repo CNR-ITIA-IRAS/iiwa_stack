@@ -1,32 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="e8b8921a-798b-4531-8385-89df791097d3" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/../iiwa_hw/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/../iiwa_hw/CMakeLists.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_hw/include/iiwa_hw.h" beforeDir="false" afterPath="$PROJECT_DIR$/../iiwa_hw/include/iiwa_hw.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_hw/src/iiwa_hw.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/../iiwa_hw/src/iiwa_hw.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/../iiwa_ros/CMakeLists.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/include/conversions.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/include/iiwa_ros.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/include/iiwa_ros/conversions.h" beforeDir="false" afterPath="$PROJECT_DIR$/../iiwa_ros/include/iiwa_ros/conversions.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/include/iiwa_ros/iiwa_services.hpp" beforeDir="false" afterPath="$PROJECT_DIR$/../iiwa_ros/include/iiwa_ros/iiwa_services.hpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/include/iiwa_ros/path_parameters_service.h" beforeDir="false" afterPath="$PROJECT_DIR$/../iiwa_ros/include/iiwa_ros/path_parameters_service.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/include/iiwa_ros/smart_servo_service.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/include/iiwa_ros/time_to_destination_service.h" beforeDir="false" afterPath="$PROJECT_DIR$/../iiwa_ros/include/iiwa_ros/time_to_destination_service.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/include/iiwa_services.hpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/include/path_parameters_service.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/include/smart_servo_service.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/include/time_to_destination_service.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/package.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../iiwa_ros/package.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/src/iiwa_ros.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/../iiwa_ros/src/iiwa_ros.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/src/path_parameters_service.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/../iiwa_ros/src/path_parameters_service.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/src/smart_servo_service.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../iiwa_ros/src/time_to_destination_service.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/../iiwa_ros/src/time_to_destination_service.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/libraries/KUKAJavaLib.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/libraries/KUKAJavaLib.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/libraries/ROSJavaLib.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/libraries/ROSJavaLib.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/iiwa_ros_java.iml" beforeDir="false" afterPath="$PROJECT_DIR$/iiwa_ros_java.iml" afterDir="false" />
-    </list>
+    <list default="true" id="e8b8921a-798b-4531-8385-89df791097d3" name="Default Changelist" comment="" />
     <ignored path="$PROJECT_DIR$/out/" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -38,8 +13,10 @@
     <session id="-368609757">
       <usages-collector id="statistics.lifecycle.project">
         <counts>
+          <entry key="project.closed" value="1" />
+          <entry key="project.open.time.20" value="1" />
           <entry key="project.open.time.9" value="1" />
-          <entry key="project.opened" value="1" />
+          <entry key="project.opened" value="2" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.extensions.open">
@@ -58,24 +35,24 @@
     </session>
   </component>
   <component name="FileEditorManager">
-    <leaf>
-      <file pinned="false" current-in-tab="false">
+    <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/de/tum/in/camp/kuka/ros/app/ROSSmartServo.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="270">
-              <caret line="18" column="23" selection-start-line="18" selection-start-column="19" selection-end-line="18" selection-end-column="23" />
+            <state relative-caret-position="-42">
+              <caret line="297" column="73" selection-start-line="297" selection-start-column="55" selection-end-line="297" selection-end-column="73" />
               <folding>
-                <element signature="method#addNodesToExecutor#0;class#ROSSmartServo#0" />
+                <element signature="n#!!doc" expanded="true" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/de/tum/in/camp/kuka/ros/ControlModeHandler.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-1461">
-              <caret line="133" column="62" selection-start-line="133" selection-start-column="56" selection-end-line="133" selection-end-column="62" />
+            <state relative-caret-position="-300">
+              <caret line="163" column="30" lean-forward="true" selection-start-line="163" selection-start-column="30" selection-end-line="163" selection-end-column="30" />
               <folding>
                 <element signature="method#switchSmartServoMotion#2;class#ControlModeHandler#0" />
                 <element signature="method#switchSmartServoMotion#3;class#ControlModeHandler#0" />
@@ -109,11 +86,11 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
   </component>
-  <component name="ProjectFrameBounds" extendedState="6">
-    <option name="x" value="247" />
-    <option name="y" value="45" />
-    <option name="width" value="1400" />
-    <option name="height" value="990" />
+  <component name="ProjectFrameBounds" extendedState="4">
+    <option name="x" value="948" />
+    <option name="y" value="24" />
+    <option name="width" value="948" />
+    <option name="height" value="1032" />
   </component>
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectView">
@@ -121,6 +98,8 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="PackagesPane" />
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -150,8 +129,6 @@
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
-      <pane id="PackagesPane" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -183,19 +160,15 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="-1" y="24" width="1898" height="1033" extended-state="6" />
-    <editor active="true" />
+    <frame x="948" y="24" width="948" height="1032" extended-state="4" />
     <layout>
-      <window_info id="Image Layers" />
-      <window_info id="Designer" />
-      <window_info id="UI Designer" />
-      <window_info id="Capture Tool" />
-      <window_info id="Favorites" side_tool="true" />
-      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.24972972" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.14777778" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
-      <window_info anchor="bottom" id="Version Control" show_stripe_button="false" />
-      <window_info anchor="bottom" id="Terminal" />
-      <window_info anchor="bottom" id="Event Log" side_tool="true" />
+      <window_info id="Image Layers" order="2" />
+      <window_info id="Designer" order="3" />
+      <window_info id="UI Designer" order="4" />
+      <window_info id="Capture Tool" order="5" />
+      <window_info id="Favorites" order="6" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" />
       <window_info anchor="bottom" id="Run" order="2" />
@@ -203,14 +176,17 @@
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" />
-      <window_info anchor="right" id="Palette" />
-      <window_info anchor="right" id="Theme Preview" />
-      <window_info anchor="right" id="Capture Analysis" />
-      <window_info anchor="right" id="Palette&#9;" />
-      <window_info anchor="right" id="Maven Projects" />
+      <window_info anchor="bottom" id="Terminal" order="7" />
+      <window_info anchor="bottom" id="Event Log" order="8" side_tool="true" />
+      <window_info anchor="bottom" id="Version Control" order="9" show_stripe_button="false" />
       <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
+      <window_info anchor="right" id="Palette" order="3" />
+      <window_info anchor="right" id="Capture Analysis" order="4" />
+      <window_info anchor="right" id="Theme Preview" order="5" />
+      <window_info anchor="right" id="Palette&#9;" order="6" />
+      <window_info anchor="right" id="Maven Projects" order="7" />
     </layout>
   </component>
   <component name="VcsContentAnnotationSettings">
@@ -227,23 +203,23 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/de/tum/in/camp/kuka/ros/app/ROSSmartServo.java">
+    <entry file="file://$PROJECT_DIR$/src/de/tum/in/camp/kuka/ros/ControlModeHandler.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="270">
-          <caret line="18" column="23" selection-start-line="18" selection-start-column="19" selection-end-line="18" selection-end-column="23" />
+        <state relative-caret-position="-300">
+          <caret line="163" column="30" lean-forward="true" selection-start-line="163" selection-start-column="30" selection-end-line="163" selection-end-column="30" />
           <folding>
-            <element signature="method#addNodesToExecutor#0;class#ROSSmartServo#0" />
+            <element signature="method#switchSmartServoMotion#2;class#ControlModeHandler#0" />
+            <element signature="method#switchSmartServoMotion#3;class#ControlModeHandler#0" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/de/tum/in/camp/kuka/ros/ControlModeHandler.java">
+    <entry file="file://$PROJECT_DIR$/src/de/tum/in/camp/kuka/ros/app/ROSSmartServo.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-1461">
-          <caret line="133" column="62" selection-start-line="133" selection-start-column="56" selection-end-line="133" selection-end-column="62" />
+        <state relative-caret-position="-42">
+          <caret line="297" column="73" selection-start-line="297" selection-start-column="55" selection-end-line="297" selection-end-column="73" />
           <folding>
-            <element signature="method#switchSmartServoMotion#2;class#ControlModeHandler#0" />
-            <element signature="method#switchSmartServoMotion#3;class#ControlModeHandler#0" />
+            <element signature="n#!!doc" expanded="true" />
           </folding>
         </state>
       </provider>

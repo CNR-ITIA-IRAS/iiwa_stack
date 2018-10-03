@@ -48,8 +48,6 @@ bool ServoMotion::callService()
                 ROS_ERROR_STREAM ( service_name_ << " failed, Java error: " << service_error_ );
             } else if ( verbose_ ) {
                 ROS_INFO_STREAM ( ros::this_node::getName() << ":" << service_name_ << " successfully called." );
-                ROS_INFO_STREAM(config_.request);
-                ROS_INFO_STREAM("-----------------------");
             }
         } else if ( verbose_ ) {
             ROS_ERROR_STREAM ( service_name_ << " could not be called" );
@@ -113,7 +111,7 @@ void ServoMotion::initSinePatternMode ( const int cartesian_dof, const double fr
     initCartesianLimits ( max_path_deviation, max_cartesian_velocity, max_control_force, max_control_force_stop );
 }
 
-bool ServoMotion::setFRIPositionControlMode( const int port, const std::string hostname )
+bool ServoMotion::setFRIJointPositionControlMode( const int port, const std::string hostname )
 {
 #if defined( ENABLE_FRI )
     fri_app_.reset( new iiwa_ros::LBRJointOverlayApp( port, hostname )  );
@@ -124,25 +122,71 @@ bool ServoMotion::setFRIPositionControlMode( const int port, const std::string h
 #endif
 }
 
-bool ServoMotion::setPositionControlMode()
+bool ServoMotion::setFRIJointImpedanceControlMode( const int port, const std::string hostname, const iiwa_msgs::JointQuantity& joint_stiffnes, const iiwa_msgs::JointQuantity& joint_damping )
 {
 #if defined( ENABLE_FRI )
-  ROS_INFO("setPositionControlMode()");
-  fri_app_.reset();
-#endif
-    config_.request.control_mode = iiwa_msgs::ControlMode::POSITION_CONTROL;
+    if( !setJointImpedanceMode(joint_stiffnes, joint_damping) )
+    {
+      ROS_ERROR("Failed in setting the impedance mode. ");
+      return false;
+    }
+    ros::Duration(0.5).sleep();
+    
+    fri_app_.reset( new iiwa_ros::LBRJointOverlayApp( port, hostname )  );
+    config_.request.control_mode = 7;
     return callService();
+#else
+  #error "ENABLE_FRI is set to off in compilation configuration. Check it."
+#endif
+}
 
+
+bool ServoMotion::setFRIJointTorqueControlMode( const int port, const std::string hostname, const iiwa_msgs::JointQuantity& joint_stiffnes, const iiwa_msgs::JointQuantity& joint_damping )
+{
+#if defined( ENABLE_FRI )
+    if( !setJointImpedanceMode(joint_stiffnes, joint_damping) )
+    {
+      ROS_ERROR("Failed in setting the impedance mode. ");
+      return false;
+    }
+    ros::Duration(0.5).sleep();
+    
+    fri_app_.reset( new iiwa_ros::LBRJointOverlayApp( port, hostname )  );
+    config_.request.control_mode = 6;
+    return callService();
+#else
+  #error "ENABLE_FRI is set to off in compilation configuration. Check it."
+#endif
+}
+
+
+
+bool ServoMotion::setPositionControlMode()
+{
+  ROS_INFO("setPositionControlMode()");
+  config_.request.control_mode = iiwa_msgs::ControlMode::POSITION_CONTROL;
+  if( !callService() )
+  {
+    return false;
+  }
+#if defined( ENABLE_FRI )
+  fri_app_.reset( );
+#endif
+  return true;
 }
 
 bool ServoMotion::setJointImpedanceMode ( const iiwa_msgs::JointQuantity& joint_stiffnes, const iiwa_msgs::JointQuantity& joint_damping )
 {
-#ifdef ENABLE_FRI
   ROS_INFO("setJointImpedanceMode()");
-  fri_app_.reset();
-#endif
-    initJointImpedanceMode ( joint_stiffnes, joint_damping );
-    return callService();
+  initJointImpedanceMode ( joint_stiffnes, joint_damping );
+  if( !callService() )
+  {
+    return false;
+  }
+#if defined( ENABLE_FRI )
+  fri_app_.reset( );
+#endif  
+  return true;  
 }
 
 bool ServoMotion::setJointImpedanceMode ( const double joint_stiffnes, const double joint_damping )
@@ -154,12 +198,16 @@ bool ServoMotion::setCartesianImpedanceMode ( const iiwa_msgs::CartesianQuantity
         const double nullspace_stiffness, const double nullspace_damping, const iiwa_msgs::CartesianQuantity& max_path_deviation,
         const iiwa_msgs::CartesianQuantity& max_cartesian_velocity, const iiwa_msgs::CartesianQuantity& max_control_force, const bool max_control_force_stop )
 {
-#ifdef ENABLE_FRI
   ROS_INFO("setCartesianImpedanceMode()");
-  fri_app_.reset();
-#endif
   initCartesianImpedanceMode ( cartesian_stiffness, cartesian_damping, nullspace_stiffness, nullspace_damping, max_path_deviation, max_cartesian_velocity,max_control_force, max_control_force_stop );
-  return callService();
+  if( !callService() )
+  {
+    return false;
+  }
+#if defined( ENABLE_FRI )
+  fri_app_.reset( );
+#endif
+  return true;  
 }
 
 bool ServoMotion::setCartesianImpedanceMode ( const iiwa_msgs::CartesianQuantity& cartesian_stiffness, const iiwa_msgs::CartesianQuantity& cartesian_damping,
@@ -185,12 +233,17 @@ bool ServoMotion::setDesiredForceMode ( const int cartesian_dof, const double de
                                         const iiwa_msgs::CartesianQuantity& max_path_deviation, const iiwa_msgs::CartesianQuantity& max_cartesian_velocity,
                                         const iiwa_msgs::CartesianQuantity& max_control_force, const bool max_control_force_stop )
 {
-#ifdef ENABLE_FRI
+
   ROS_INFO("setDesiredForceMode()");
-  fri_app_.reset();
-#endif
   initDesiredForceMode ( cartesian_dof, desired_force, desired_stiffness, max_path_deviation, max_cartesian_velocity, max_control_force, max_control_force_stop );
-  return callService();
+  if( !callService() )
+  {
+    return false;
+  }
+#ifdef ENABLE_FRI
+  fri_app_.reset( );
+#endif
+  return true;
 }
 
 bool ServoMotion::setDesiredForceMode ( const int cartesian_dof, const double desired_force, const double desired_stiffness )
@@ -202,12 +255,16 @@ bool ServoMotion::setSinePatternmode ( const int cartesian_dof, const double fre
                                        const iiwa_msgs::CartesianQuantity& max_path_deviation, const iiwa_msgs::CartesianQuantity& max_cartesian_velocity,
                                        const iiwa_msgs::CartesianQuantity& max_control_force, const bool max_control_force_stop )
 {
-#ifdef ENABLE_FRI
   ROS_INFO("setSinePatternmode()");
-  fri_app_.reset();
+  initSinePatternMode ( cartesian_dof, frequency, amplitude, stiffness, max_path_deviation, max_cartesian_velocity, max_control_force, max_control_force_stop );
+  if( !callService() )
+  {
+    return false;
+  }
+#ifdef ENABLE_FRI
+  fri_app_.reset( );
 #endif
-    initSinePatternMode ( cartesian_dof, frequency, amplitude, stiffness, max_path_deviation, max_cartesian_velocity, max_control_force, max_control_force_stop );
-    return callService();
+  return true;
 }
 
 bool ServoMotion::setSinePatternmode ( const int cartesian_dof, const double frequency, const double amplitude, const double stiffness )

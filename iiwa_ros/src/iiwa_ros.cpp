@@ -36,7 +36,7 @@ ros::Time last_update_time;
 
 iiwaRos::iiwaRos() { }
 
-void iiwaRos::init()
+void iiwaRos::init(const bool verbosity)
 {
     holder_state_pose_.init ( "state/CartesianPose" );
     holder_state_joint_position_.init ( "state/JointPosition" );
@@ -56,6 +56,10 @@ void iiwaRos::init()
     servo_motion_service_.setServiceName ( "configuration/configureSmartServo" );
     path_parameters_service_.setServiceName ( "configuration/pathParameters" );
     time_to_destination_service_.setServiceName ( "state/timeToDestination" );
+    
+    servo_motion_service_.setVerbosity(verbosity);
+    path_parameters_service_.setVerbosity(verbosity);
+    time_to_destination_service_.setVerbosity(verbosity);
 }
 
 bool iiwaRos::getRobotIsConnected()
@@ -108,7 +112,8 @@ void iiwaRos::setCartesianPose ( const geometry_msgs::PoseStamped& position )
 {
 #if defined( ENABLE_FRI )
   if(( servo_motion_service_.getControlModeActive() == 5 )
-  || ( servo_motion_service_.getControlModeActive() == 6 ) )
+  || ( servo_motion_service_.getControlModeActive() == 6 )
+  || ( servo_motion_service_.getControlModeActive() == 7 ) )
   {
     throw std::runtime_error( "FRI : TODO" );
   }
@@ -123,11 +128,12 @@ void iiwaRos::setCartesianPose ( const geometry_msgs::PoseStamped& position )
 #endif
 }
 
-void iiwaRos::setJointPosition ( const iiwa_msgs::JointPosition& position )
+void iiwaRos::setJointPosition ( const iiwa_msgs::JointPosition& position, double goal_tolerance )
 {
 #if defined( ENABLE_FRI )
   if( ( servo_motion_service_.getControlModeActive() == 5 )
-  ||  ( servo_motion_service_.getControlModeActive() == 6 ) )
+  ||  ( servo_motion_service_.getControlModeActive() == 6 ) 
+  ||  ( servo_motion_service_.getControlModeActive() == 7 ) )
   {
     servo_motion_service_.getFriClient()->newJointPosCommand( position );
   }
@@ -140,13 +146,32 @@ void iiwaRos::setJointPosition ( const iiwa_msgs::JointPosition& position )
   holder_command_joint_position_.set ( position );
   holder_command_joint_position_.publishIfNew();
 #endif
+  iiwa_msgs::JointPosition j_cmd = position;
+  iiwa_msgs::JointPosition j_msr;
+  while( 1 )
+  {
+    getJointPosition ( j_msr );
+    double dist = std::sqrt( std::pow( j_cmd.position.a1-j_msr.position.a1, 2 )
+                           + std::pow( j_cmd.position.a2-j_msr.position.a2, 2 )
+                           + std::pow( j_cmd.position.a3-j_msr.position.a3, 2 )
+                           + std::pow( j_cmd.position.a4-j_msr.position.a4, 2 )
+                           + std::pow( j_cmd.position.a5-j_msr.position.a5, 2 )
+                           + std::pow( j_cmd.position.a6-j_msr.position.a6, 2 )
+                           + std::pow( j_cmd.position.a7-j_msr.position.a7, 2 ) );
+    if( ( dist < 0.05 ) || ( dist < goal_tolerance ) ) 
+    {
+      break;
+    }
+    ros::Duration(0.005).sleep();
+  }
 }
 
 void iiwaRos::setJointVelocity ( const iiwa_msgs::JointVelocity& velocity )
 {
 #if defined( ENABLE_FRI )
   if( ( servo_motion_service_.getControlModeActive() == 5 )
-  ||  ( servo_motion_service_.getControlModeActive() == 6 ) )
+  ||  ( servo_motion_service_.getControlModeActive() == 6 ) 
+  ||  ( servo_motion_service_.getControlModeActive() == 7 ) )
   {
     throw std::runtime_error( "FRI : TODO" );
   }
@@ -165,7 +190,8 @@ void iiwaRos::setJointPositionVelocity ( const iiwa_msgs::JointPositionVelocity&
 {
 #if defined( ENABLE_FRI )
   if( ( servo_motion_service_.getControlModeActive() == 5 )
-  ||  ( servo_motion_service_.getControlModeActive() == 6 ) )
+  ||  ( servo_motion_service_.getControlModeActive() == 6 ) 
+  ||  ( servo_motion_service_.getControlModeActive() == 7 ) )
   {
     throw std::runtime_error( "FRI : TODO" );
   }

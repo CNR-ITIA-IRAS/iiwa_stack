@@ -159,7 +159,7 @@ namespace iiwa_ros
      * 
      * @return void
      */
-    void init();
+    void init(const bool verbosity = false );
     
     /**
      * @brief Returns true is a new Cartesian pose of the robot is available.
@@ -261,7 +261,7 @@ namespace iiwa_ros
      * @param position the joint position to set the robot.
      * @return void
      */
-    void setJointPosition(const iiwa_msgs::JointPosition& position);
+    void setJointPosition(const iiwa_msgs::JointPosition& position, double goal_tolerance = 99999.0 );
     
     /**
      * @brief Set the joint velocity of the robot.

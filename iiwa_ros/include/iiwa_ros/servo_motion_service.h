@@ -28,7 +28,7 @@
 
 #ifdef ENABLE_FRI
 
-#include "fri_client.h"
+#include <iiwa_ros/fri_client.h>
 
 #endif
 
@@ -70,8 +70,21 @@ public:
      *
      * @return bool - false is service call fails.
      */
-    bool setFRIPositionControlMode( const int port, const std::string hostname );
+    bool setFRIJointPositionControlMode( const int port, const std::string hostname );
     
+    /**
+     * @brief Sets the control mode to PositionControl.
+     *
+     * @return bool - false is service call fails.
+     */
+    bool setFRIJointImpedanceControlMode( const int port, const std::string hostname, const iiwa_msgs::JointQuantity& joint_stiffnes, const iiwa_msgs::JointQuantity& joint_damping );
+    
+    /**
+     * @brief Sets the control mode to PositionControl.
+     *
+     * @return bool - false is service call fails.
+     */
+    bool setFRIJointTorqueControlMode( const int port, const std::string hostname, const iiwa_msgs::JointQuantity& joint_stiffnes, const iiwa_msgs::JointQuantity& joint_damping );
     
     std::shared_ptr< iiwa_ros::LBRJointOverlayApp >& getFriClient( ) { return fri_app_; }
     
