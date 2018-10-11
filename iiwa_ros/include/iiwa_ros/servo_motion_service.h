@@ -70,21 +70,21 @@ public:
      *
      * @return bool - false is service call fails.
      */
-    bool setFRIJointPositionControlMode( const int port, const std::string hostname );
+    bool setFRIJointPositionControlMode( const int port, const std::string hostname, int connection_timeout_ms );
     
     /**
      * @brief Sets the control mode to PositionControl.
      *
      * @return bool - false is service call fails.
      */
-    bool setFRIJointImpedanceControlMode( const int port, const std::string hostname, const iiwa_msgs::JointQuantity& joint_stiffnes, const iiwa_msgs::JointQuantity& joint_damping );
+    bool setFRIJointImpedanceControlMode( const int port, const std::string hostname, int connection_timeout_ms, const iiwa_msgs::JointQuantity& joint_stiffnes, const iiwa_msgs::JointQuantity& joint_damping );
     
     /**
      * @brief Sets the control mode to PositionControl.
      *
      * @return bool - false is service call fails.
      */
-    bool setFRIJointTorqueControlMode( const int port, const std::string hostname, const iiwa_msgs::JointQuantity& joint_stiffnes, const iiwa_msgs::JointQuantity& joint_damping );
+    bool setFRIJointTorqueControlMode( const int port, const std::string hostname, int connection_timeout_ms, const iiwa_msgs::JointQuantity& joint_stiffnes, const iiwa_msgs::JointQuantity& joint_damping );
     
     std::shared_ptr< iiwa_ros::LBRJointOverlayApp >& getFriClient( ) { return fri_app_; }
     

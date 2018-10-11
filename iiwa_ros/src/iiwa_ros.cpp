@@ -128,11 +128,28 @@ void iiwaRos::setCartesianPose ( const geometry_msgs::PoseStamped& position )
 #endif
 }
 
+void iiwaRos::setJointTorque ( const iiwa_msgs::JointTorque& torque )
+{
+#if defined( ENABLE_FRI )
+  if( ( servo_motion_service_.getControlModeActive() == 6 ) )
+  {
+    servo_motion_service_.getFriClient()->newJointTorqueCommand( torque );
+  }
+  else
+  {
+//     holder_command_joint_position_.set ( position );
+//     holder_command_joint_position_.publishIfNew();
+  }
+#else
+//   holder_command_joint_position_.set ( position );
+//   holder_command_joint_position_.publishIfNew();
+#endif
+}
+
 void iiwaRos::setJointPosition ( const iiwa_msgs::JointPosition& position, double goal_tolerance )
 {
 #if defined( ENABLE_FRI )
   if( ( servo_motion_service_.getControlModeActive() == 5 )
-  ||  ( servo_motion_service_.getControlModeActive() == 6 ) 
   ||  ( servo_motion_service_.getControlModeActive() == 7 ) )
   {
     servo_motion_service_.getFriClient()->newJointPosCommand( position );

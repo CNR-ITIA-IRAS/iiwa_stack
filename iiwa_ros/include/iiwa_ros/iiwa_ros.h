@@ -263,6 +263,8 @@ namespace iiwa_ros
      */
     void setJointPosition(const iiwa_msgs::JointPosition& position, double goal_tolerance = 99999.0 );
     
+    void setJointTorque(const iiwa_msgs::JointTorque& torque );
+    
     /**
      * @brief Set the joint velocity of the robot.
      * 

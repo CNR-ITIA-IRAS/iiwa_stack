@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   iiwa_msgs
   roscpp
   realtime_utilities
+  realtime_tools
 )
 
 catkin_package(
