@@ -161,7 +161,6 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
       
       if (realtime_pub_.trylock())
       { 
-        std::cout<<"pubblico" <<std::endl;
         realtime_pub_.msg_.name     = {"a1_cmd", "a2_cmd", "a3_cmd", "a4_cmd","a5_cmd", "a6_cmd", "a7_cmd"
                                       ,"a1_msr", "a2_msr", "a3_msr", "a4_msr","a5_msr", "a6_msr", "a7_msr" 
                                       ,"a1_cmd_iiwa", "a2_cmd_iiwa", "a3_cmd_iiwa", "a4_cmd_iiwa","a5_cmd_iiwa", "a6_cmd_iiwa", "a7_cmd_iiwa" };
