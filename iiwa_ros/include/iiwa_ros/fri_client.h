@@ -56,6 +56,7 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
       : command_joint_position_         ( target_queue_lenght ) 
       , command_joint_torque_           ( 100 ) 
       , last_joint_pos_command_         ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
+      , joint_pos_command_              ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
       , last_joint_torque_command_      ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
       , initial_joints_                 ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
       , control_running_                ( false )
@@ -122,18 +123,19 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
       
     virtual void command()
     {
+      joint_pos_command_ = last_joint_pos_command_;
       if( robotState().getClientCommandMode() == KUKA::FRI::POSITION )
       {
         if( command_joint_position_.empty() )
         {
           
           //std::cout << to_string( last_joint_pos_command_ ) << std::endl;
-          robotCommand().setJointPosition( &last_joint_pos_command_[0] );
+          robotCommand().setJointPosition( &joint_pos_command_[0] );
         }
         else
         {
-          last_joint_pos_command_ = command_joint_position_.front();
-          robotCommand().setJointPosition( &last_joint_pos_command_[0] );
+          joint_pos_command_ = command_joint_position_.front();
+          robotCommand().setJointPosition( &joint_pos_command_[0] );
           command_joint_position_.pop_front();
         }
       }
@@ -154,10 +156,27 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
         }
       }
       
+      auto const joint_pos_msr = robotState().getMeasuredJointPosition();
+      auto const joint_pos_cmd_iiwa = robotState().getCommandedJointPosition();
+      
       if (realtime_pub_.trylock())
-      {
+      { 
+        std::cout<<"pubblico" <<std::endl;
+        realtime_pub_.msg_.name     = {"a1_cmd", "a2_cmd", "a3_cmd", "a4_cmd","a5_cmd", "a6_cmd", "a7_cmd"
+                                      ,"a1_msr", "a2_msr", "a3_msr", "a4_msr","a5_msr", "a6_msr", "a7_msr" 
+                                      ,"a1_cmd_iiwa", "a2_cmd_iiwa", "a3_cmd_iiwa", "a4_cmd_iiwa","a5_cmd_iiwa", "a6_cmd_iiwa", "a7_cmd_iiwa" };
+        realtime_pub_.msg_.position = {last_joint_pos_command_[0], last_joint_pos_command_[1], last_joint_pos_command_[2]
+                                     , last_joint_pos_command_[3], last_joint_pos_command_[4], last_joint_pos_command_[5], last_joint_pos_command_[6]
+                                     , joint_pos_msr[0], joint_pos_msr[1], joint_pos_msr[2]
+                                     , joint_pos_msr[3], joint_pos_msr[4], joint_pos_msr[5], joint_pos_msr[6]
+                                     , joint_pos_cmd_iiwa[0], joint_pos_cmd_iiwa[1], joint_pos_cmd_iiwa[2]
+                                     , joint_pos_cmd_iiwa[3], joint_pos_cmd_iiwa[4], joint_pos_cmd_iiwa[5], joint_pos_cmd_iiwa[6] };
+        
+        realtime_pub_.msg_.header.stamp = ros::Time::now();
+        
         realtime_pub_.unlockAndPublish();
       }
+      last_joint_pos_command_ = joint_pos_command_ ;
 
     }
     
@@ -227,6 +246,7 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
     realtime_utilities::circ_buffer< std::vector<double> > command_joint_position_;
     realtime_utilities::circ_buffer< std::vector<double> > command_joint_torque_;
     std::vector<double> last_joint_pos_command_;
+    std::vector<double> joint_pos_command_;
     std::vector<double> last_joint_torque_command_;
     std::vector<double> initial_joints_;
     std::vector<double> initial_torque_;
