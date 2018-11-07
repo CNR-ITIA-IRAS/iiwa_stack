@@ -56,7 +56,6 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
       : command_joint_position_         ( target_queue_lenght ) 
       , command_joint_torque_           ( 100 )
       , command_wrench_                 ( 100 ) 
-      , joint_pos_command_              ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
       , last_joint_pos_command_         ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
       , last_joint_torque_command_      ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
       , initial_joints_                 ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
@@ -64,8 +63,9 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
       , initial_wrench_                 ( 6, 0.0 )
       , control_running_                ( false )
     { 
-      // nothing to do so far;
+      
       realtime_pub_.init( ros::NodeHandle("~"), "fri", 100);
+      // nothing to do so far;
     };
     
     ~LBRJointOverlayClient( ) { };
@@ -132,9 +132,28 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
       
     virtual void command()
     {
-      // In command(), the joint values have to be sent. Which is done by calling
       // the base method.
       LBRClient::command();
+      
+      auto const joint_pos_msr = robotState().getMeasuredJointPosition();
+      auto const joint_pos_cmd_iiwa = robotState().getCommandedJointPosition();
+      
+      if (realtime_pub_.trylock())
+      { 
+        realtime_pub_.msg_.name     = {"a1_cmd", "a2_cmd", "a3_cmd", "a4_cmd","a5_cmd", "a6_cmd", "a7_cmd"
+                                      ,"a1_msr", "a2_msr", "a3_msr", "a4_msr","a5_msr", "a6_msr", "a7_msr" 
+                                      ,"a1_cmd_iiwa", "a2_cmd_iiwa", "a3_cmd_iiwa", "a4_cmd_iiwa","a5_cmd_iiwa", "a6_cmd_iiwa", "a7_cmd_iiwa" };
+        realtime_pub_.msg_.position = {last_joint_pos_command_[0], last_joint_pos_command_[1], last_joint_pos_command_[2]
+                                     , last_joint_pos_command_[3], last_joint_pos_command_[4], last_joint_pos_command_[5], last_joint_pos_command_[6]
+                                     , joint_pos_msr[0], joint_pos_msr[1], joint_pos_msr[2]
+                                     , joint_pos_msr[3], joint_pos_msr[4], joint_pos_msr[5], joint_pos_msr[6]
+                                     , joint_pos_cmd_iiwa[0], joint_pos_cmd_iiwa[1], joint_pos_cmd_iiwa[2]
+                                     , joint_pos_cmd_iiwa[3], joint_pos_cmd_iiwa[4], joint_pos_cmd_iiwa[5], joint_pos_cmd_iiwa[6] };
+        
+        realtime_pub_.msg_.header.stamp = ros::Time::now();
+        
+        realtime_pub_.unlockAndPublish();
+      }
 
       if( robotState().getClientCommandMode() == KUKA::FRI::POSITION )
       {
@@ -181,27 +200,6 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
           command_wrench_.pop_front();
         } 
       }
-      
-      auto const joint_pos_msr = robotState().getMeasuredJointPosition();
-      auto const joint_pos_cmd_iiwa = robotState().getCommandedJointPosition();
-      
-      if (realtime_pub_.trylock())
-      { 
-        realtime_pub_.msg_.name     = {"a1_cmd", "a2_cmd", "a3_cmd", "a4_cmd","a5_cmd", "a6_cmd", "a7_cmd"
-                                      ,"a1_msr", "a2_msr", "a3_msr", "a4_msr","a5_msr", "a6_msr", "a7_msr" 
-                                      ,"a1_cmd_iiwa", "a2_cmd_iiwa", "a3_cmd_iiwa", "a4_cmd_iiwa","a5_cmd_iiwa", "a6_cmd_iiwa", "a7_cmd_iiwa" };
-        realtime_pub_.msg_.position = {last_joint_pos_command_[0], last_joint_pos_command_[1], last_joint_pos_command_[2]
-                                     , last_joint_pos_command_[3], last_joint_pos_command_[4], last_joint_pos_command_[5], last_joint_pos_command_[6]
-                                     , joint_pos_msr[0], joint_pos_msr[1], joint_pos_msr[2]
-                                     , joint_pos_msr[3], joint_pos_msr[4], joint_pos_msr[5], joint_pos_msr[6]
-                                     , joint_pos_cmd_iiwa[0], joint_pos_cmd_iiwa[1], joint_pos_cmd_iiwa[2]
-                                     , joint_pos_cmd_iiwa[3], joint_pos_cmd_iiwa[4], joint_pos_cmd_iiwa[5], joint_pos_cmd_iiwa[6] };
-        
-        realtime_pub_.msg_.header.stamp = ros::Time::now();
-        
-        realtime_pub_.unlockAndPublish();
-      }
-      last_joint_pos_command_ = joint_pos_command_ ;
     }
     
     void newJointPosCommand( const std::vector< double >& new_joint_pos_command ) 
@@ -221,18 +219,8 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
       {
         throw std::runtime_error("Mismatch of New Command Vector"); 
       }
-      if( command_joint_position_.empty() )
-      {
-        command_joint_position_.push_back( new_joint_pos_command );
-      }
-      else
-      {
-        std::vector<double> command_joint_position = command_joint_position_.back();
-        if( diff( command_joint_position, new_joint_pos_command ) > 0.001 * M_PI / 180.0 )
-        {
-          command_joint_position_.push_back( new_joint_pos_command );
-        }
-      }
+
+      command_joint_position_.push_back( new_joint_pos_command );
 
       return;
     }
@@ -299,7 +287,6 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
     std::vector<double> initial_joints_;
     std::vector<double> initial_torque_;
     std::vector<double> initial_wrench_;
-    std::vector<double> joint_pos_command_;
     KUKA::FRI::ESessionState actual_state_;
     KUKA::FRI::ESessionState actual_state_prev_;
     bool control_running_;
@@ -363,7 +350,7 @@ public:
     new_wrench_command[5] = wrench.c;
     return client_.newWrenchCommand( new_wrench_command );
   }
-
+  
   void connect()
   {
     ROS_WARN("FRI Connect to %s:%d ", hostname_.c_str(), port_ );
@@ -373,8 +360,7 @@ public:
       throw std::runtime_error( ("Error in FRI Connection (" + hostname_ + ":" + std::to_string( port_ ) ).c_str() );
     }
     stop_fri_command_thread_ = false;
-
-    command_thread_.reset( new boost::thread(boost::bind(&LBROverlayApp::step, this)) );
+    command_thread_.reset( new boost::thread(boost::bind(&LBROverlayApp::step, this)) );    
     ROS_WARN("FRI Connect. Done.");
   }
   void disconnect()
@@ -410,7 +396,6 @@ private:
 //           ROS_WARN("Break the FRI control loop. Shutdown transition detected.(%d/%d)", (int) oldState, (int)newState );
 //           break;
 //         }
-
         success = app_->step();
       }
       else
