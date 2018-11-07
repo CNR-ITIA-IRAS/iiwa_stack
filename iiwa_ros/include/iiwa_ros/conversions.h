@@ -26,6 +26,10 @@
 #include <iiwa_msgs/JointQuantity.h>
 #include <iiwa_msgs/CartesianQuantity.h>
 
+#if defined( ENABLE_FRI )
+  #include <iiwa_fri/friLBRState.h>
+#endif
+
 namespace iiwa_ros 
 {
   
@@ -127,5 +131,17 @@ namespace iiwa_ros
     quantity.b = rotation_value;
     quantity.c = rotation_value;
     return quantity;
+  }
+  
+  std::vector<double> jointPositionToVector(const iiwa_msgs::JointQuantity& quantity) {
+    std::vector<double> ret(KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0);
+    ret[0] = quantity.a1;
+    ret[1] = quantity.a2;
+    ret[2] = quantity.a3;
+    ret[3] = quantity.a4;
+    ret[4] = quantity.a5;
+    ret[5] = quantity.a6;
+    ret[6] = quantity.a7;
+    return ret;
   }
 }

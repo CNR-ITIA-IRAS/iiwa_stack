@@ -36,7 +36,6 @@ ServoMotion::~ServoMotion()
   setPositionControlMode();
 }
 
-
 ServoMotion::ServoMotion ( const std::string& service_name, const bool verbose ) : iiwaServices<iiwa_msgs::ConfigureSmartServo> ( service_name, verbose ) {}
 
 bool ServoMotion::callService()
@@ -50,7 +49,7 @@ bool ServoMotion::callService()
                 ROS_INFO_STREAM ( ros::this_node::getName() << ":" << service_name_ << " successfully called." );
             }
         } else if ( verbose_ ) {
-            ROS_ERROR_STREAM ( service_name_ << " could not be called" );
+            ROS_ERROR_STREAM (  "The service '" << client_.getService() << "' (name:" << service_name_ << ") could not be called" );
         }
         return config_.response.success;
     }
