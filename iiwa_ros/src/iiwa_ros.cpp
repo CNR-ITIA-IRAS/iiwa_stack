@@ -49,6 +49,7 @@ void iiwaRos::init(const bool verbosity)
     holder_state_destination_reached_.init ( "state/DestinationReached" );
 
     holder_command_pose_.init ( "command/CartesianPose" );
+    holder_command_payload_.init ( "command/Payload" );
     holder_command_joint_position_.init ( "command/JointPosition" );
     holder_command_joint_position_velocity_.init ( "command/JointPositionVelocity" );
     holder_command_joint_velocity_.init ( "command/JointVelocity" );
@@ -113,7 +114,9 @@ void iiwaRos::setCartesianPose ( const geometry_msgs::PoseStamped& position )
 #if defined( ENABLE_FRI )
   if(( servo_motion_service_.getControlModeActive() == 5 )
   || ( servo_motion_service_.getControlModeActive() == 6 )
-  || ( servo_motion_service_.getControlModeActive() == 7 ) )
+  || ( servo_motion_service_.getControlModeActive() == 7 )
+  || ( servo_motion_service_.getControlModeActive() == 8 ) 
+  )
   {
     throw std::runtime_error( "FRI : TODO" );
   }
@@ -128,11 +131,68 @@ void iiwaRos::setCartesianPose ( const geometry_msgs::PoseStamped& position )
 #endif
 }
 
+void iiwaRos::setPayload ( const geometry_msgs::PoseStamped& position )
+{
+#if defined( ENABLE_FRI )
+  if(( servo_motion_service_.getControlModeActive() == 5 )
+  || ( servo_motion_service_.getControlModeActive() == 6 )
+  || ( servo_motion_service_.getControlModeActive() == 7 )
+  || ( servo_motion_service_.getControlModeActive() == 8 ) 
+  )
+  {
+    throw std::runtime_error( "FRI : TODO" );
+  }
+  else
+  {
+    holder_command_payload_.set ( position );
+    holder_command_payload_.publishIfNew();
+  }
+#else
+    holder_command_payload_.set ( position );
+    holder_command_payload_.publishIfNew();
+#endif
+}
+
+void iiwaRos::setJointTorque ( const iiwa_msgs::JointTorque& torque )
+{
+#if defined( ENABLE_FRI )
+  if( ( servo_motion_service_.getControlModeActive() == 6 ) )
+  {
+    servo_motion_service_.getFriClient()->newJointTorqueCommand( torque );
+  }
+  else
+  {
+//     holder_command_joint_position_.set ( position );
+//     holder_command_joint_position_.publishIfNew();
+  }
+#else
+//   holder_command_joint_position_.set ( position );
+//   holder_command_joint_position_.publishIfNew();
+#endif
+}
+
+void iiwaRos::setWrench ( const iiwa_msgs::CartesianQuantity& wrench )
+{
+#if defined( ENABLE_FRI )
+  if( ( servo_motion_service_.getControlModeActive() == 8 ) )
+  {
+    servo_motion_service_.getFriClient()->newWrenchCommand( wrench );
+  }
+  else
+  {
+//     holder_command_joint_position_.set ( position );
+//     holder_command_joint_position_.publishIfNew();
+  }
+#else
+//   holder_command_joint_position_.set ( position );
+//   holder_command_joint_position_.publishIfNew();
+#endif
+}
+
 void iiwaRos::setJointPosition ( const iiwa_msgs::JointPosition& position, double goal_tolerance )
 {
 #if defined( ENABLE_FRI )
   if( ( servo_motion_service_.getControlModeActive() == 5 )
-  ||  ( servo_motion_service_.getControlModeActive() == 6 ) 
   ||  ( servo_motion_service_.getControlModeActive() == 7 ) )
   {
     servo_motion_service_.getFriClient()->newJointPosCommand( position );

@@ -31,6 +31,7 @@
 #endif
 
 #include <iiwa_msgs/CartesianVelocity.h>
+#include <iiwa_msgs/CartesianQuantity.h>
 #include <iiwa_msgs/JointPosition.h>
 #include <iiwa_msgs/JointStiffness.h>
 #include <iiwa_msgs/JointTorque.h>
@@ -255,6 +256,8 @@ namespace iiwa_ros
      */
     void setCartesianPose(const geometry_msgs::PoseStamped& position);
     
+    void setPayload(const geometry_msgs::PoseStamped& payload); // payload.pose.position.x = mass; payload.pose.position.z = distance from flange; 
+    
     /**
      * @brief Set the joint position of the robot.
      * 
@@ -262,6 +265,10 @@ namespace iiwa_ros
      * @return void
      */
     void setJointPosition(const iiwa_msgs::JointPosition& position, double goal_tolerance = 99999.0 );
+    
+    void setJointTorque(const iiwa_msgs::JointTorque& torque );
+    
+    void setWrench(const iiwa_msgs::CartesianQuantity& wrench );
     
     /**
      * @brief Set the joint velocity of the robot.
@@ -296,6 +303,7 @@ namespace iiwa_ros
     iiwaStateHolder<std_msgs::Time> holder_state_destination_reached_;
     
     iiwaCommandHolder<geometry_msgs::PoseStamped> holder_command_pose_;
+    iiwaCommandHolder<geometry_msgs::PoseStamped> holder_command_payload_;
     iiwaCommandHolder<iiwa_msgs::JointPosition> holder_command_joint_position_;
     iiwaCommandHolder<iiwa_msgs::JointVelocity> holder_command_joint_velocity_;
     iiwaCommandHolder<iiwa_msgs::JointPositionVelocity> holder_command_joint_position_velocity_;

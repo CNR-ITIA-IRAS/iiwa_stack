@@ -111,10 +111,18 @@ void ServoMotion::initSinePatternMode ( const int cartesian_dof, const double fr
     initCartesianLimits ( max_path_deviation, max_cartesian_velocity, max_control_force, max_control_force_stop );
 }
 
-bool ServoMotion::setFRIJointPositionControlMode( const int port, const std::string hostname )
+bool ServoMotion::setFRIJointPositionControlMode( const int port, const std::string hostname, int connection_timeout_ms )
 {
 #if defined( ENABLE_FRI )
-    fri_app_.reset( new iiwa_ros::LBRJointOverlayApp( port, hostname )  );
+    if( !setPositionControlMode(  ) )
+    {
+      ROS_ERROR("Failed in setting the position control mode for FRIpos. ");
+      return false;
+    }
+    ros::Duration(0.5).sleep();
+  
+    if( fri_app_ == nullptr )
+      fri_app_.reset( new iiwa_ros::LBROverlayApp( port, hostname, connection_timeout_ms )  );
     config_.request.control_mode = 5;
     return callService();
 #else
@@ -122,17 +130,18 @@ bool ServoMotion::setFRIJointPositionControlMode( const int port, const std::str
 #endif
 }
 
-bool ServoMotion::setFRIJointImpedanceControlMode( const int port, const std::string hostname, const iiwa_msgs::JointQuantity& joint_stiffnes, const iiwa_msgs::JointQuantity& joint_damping )
+bool ServoMotion::setFRIJointImpedanceControlMode( const int port, const std::string hostname, int connection_timeout_ms, const iiwa_msgs::JointQuantity& joint_stiffnes, const iiwa_msgs::JointQuantity& joint_damping )
 {
 #if defined( ENABLE_FRI )
+    
     if( !setJointImpedanceMode(joint_stiffnes, joint_damping) )
     {
-      ROS_ERROR("Failed in setting the impedance mode. ");
+      ROS_ERROR("Failed in setting the impedance mode for FRIimp. ");
       return false;
     }
     ros::Duration(0.5).sleep();
-    
-    fri_app_.reset( new iiwa_ros::LBRJointOverlayApp( port, hostname )  );
+    if( fri_app_ == nullptr )
+      fri_app_.reset( new iiwa_ros::LBROverlayApp( port, hostname, connection_timeout_ms )  );
     config_.request.control_mode = 7;
     return callService();
 #else
@@ -140,18 +149,18 @@ bool ServoMotion::setFRIJointImpedanceControlMode( const int port, const std::st
 #endif
 }
 
-
-bool ServoMotion::setFRIJointTorqueControlMode( const int port, const std::string hostname, const iiwa_msgs::JointQuantity& joint_stiffnes, const iiwa_msgs::JointQuantity& joint_damping )
+bool ServoMotion::setFRIJointTorqueControlMode( const int port, const std::string hostname, int connection_timeout_ms, const iiwa_msgs::JointQuantity& joint_stiffnes, const iiwa_msgs::JointQuantity& joint_damping )
 {
 #if defined( ENABLE_FRI )
+  
     if( !setJointImpedanceMode(joint_stiffnes, joint_damping) )
     {
-      ROS_ERROR("Failed in setting the impedance mode. ");
+      ROS_ERROR("Failed in setting the impedance mode for FRItorque. ");
       return false;
     }
     ros::Duration(0.5).sleep();
-    
-    fri_app_.reset( new iiwa_ros::LBRJointOverlayApp( port, hostname )  );
+    if( fri_app_ == nullptr )
+      fri_app_.reset( new iiwa_ros::LBROverlayApp( port, hostname, connection_timeout_ms )  );
     config_.request.control_mode = 6;
     return callService();
 #else
@@ -159,7 +168,38 @@ bool ServoMotion::setFRIJointTorqueControlMode( const int port, const std::strin
 #endif
 }
 
+bool ServoMotion::setFRIWrenchControlMode( const int port, const std::string hostname, int connection_timeout_ms, const iiwa_msgs::CartesianQuantity& cart_stiffnes, const iiwa_msgs::CartesianQuantity& cart_damping )
+{
+#if defined( ENABLE_FRI )
+  
+    if( !setCartesianImpedanceMode(cart_stiffnes, cart_damping) )
+    {
+      ROS_ERROR("Failed in setting the FRI wrench control. ");
+      return false;
+    }
+    ros::Duration(0.5).sleep();
+    if( fri_app_ == nullptr )
+      fri_app_.reset( new iiwa_ros::LBROverlayApp( port, hostname, connection_timeout_ms )  );
+    config_.request.control_mode = 8;
+    return callService();
+#else
+  #error "ENABLE_FRI is set to off in compilation configuration. Check it."
+#endif
+}
 
+bool ServoMotion::updatePayload()
+{
+  ROS_INFO("setPayload()");
+  config_.request.control_mode = iiwa_msgs::ControlMode::PAYLOAD_UPDATE;
+  if( !callService() )
+  {
+    return false;
+  }
+#if defined( ENABLE_FRI )
+  fri_app_.reset( );
+#endif
+  return true;
+}
 
 bool ServoMotion::setPositionControlMode()
 {
