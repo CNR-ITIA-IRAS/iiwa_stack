@@ -52,10 +52,10 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
 {
   public:
   
-    LBRJointOverlayClient( const size_t target_queue_lenght = 1e3 ) 
+    LBRJointOverlayClient( const size_t target_queue_lenght = 1e8 ) 
       : command_joint_position_         ( target_queue_lenght ) 
-      , command_joint_torque_           ( 100 )
-      , command_wrench_                 ( 100 ) 
+      , command_joint_torque_           ( target_queue_lenght )
+      , command_wrench_                 ( target_queue_lenght ) 
       , last_joint_pos_command_         ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
       , last_joint_torque_command_      ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
       , initial_joints_                 ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
@@ -282,7 +282,6 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
         
         if( robotState().getClientCommandMode() != KUKA::FRI::POSITION )
         {
-          std::cout << "\n\n" << robotState().getClientCommandMode() <<std::endl;
           ROS_WARN_STREAM(ros::Time::now() << " fri_client.h - wrong command state in newJointPosCommand ");
           return;
         }
