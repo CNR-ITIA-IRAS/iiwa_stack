@@ -171,11 +171,11 @@ bool ServoMotion::setFRIWrenchControlMode( const int port, const std::string hos
 {
 #if defined( ENABLE_FRI )
   
-    if( !setCartesianImpedanceMode(cart_stiffnes, cart_damping) )
-    {
-      ROS_ERROR("Failed in setting the FRI wrench control. ");
-      return false;
-    }
+//     if( !setCartesianImpedanceMode(cart_stiffnes, cart_damping) )
+//     {
+//       ROS_ERROR("Failed in setting the FRI wrench control. ");
+//       return false;
+//     }
     ros::Duration(0.5).sleep();
     if( fri_app_ == nullptr )
       fri_app_.reset( new iiwa_ros::LBROverlayApp( port, hostname, connection_timeout_ms )  );

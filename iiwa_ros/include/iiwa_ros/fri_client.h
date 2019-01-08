@@ -171,14 +171,15 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
         if( command_wrench_.empty() )
         {
           std::vector<double> zeroWrench(6,0);
-          robotCommand().setWrench( &zeroWrench[0] );
+          robotCommand().setWrench( &last_wrench_command_[0] );
         }
         else
         {
           last_wrench_command_ = command_wrench_.front();
           robotCommand().setWrench( &last_wrench_command_[0] );
           command_wrench_.pop_front();
-        } 
+        }
+        
       }
       
       auto const joint_pos_msr = robotState().getMeasuredJointPosition();
@@ -368,6 +369,8 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
         throw std::runtime_error("Mismatch of New Command Vector"); 
       }
       command_wrench_.push_back( new_wrench_command );
+      
+//       std::cout<< "new commandded wrench: " << new_wrench_command[0] << "; " << new_wrench_command[1] << "; " << new_wrench_command[2] << "; " << std::endl;
     
       return;
     }

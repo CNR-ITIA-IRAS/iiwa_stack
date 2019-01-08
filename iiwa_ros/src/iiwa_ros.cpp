@@ -140,12 +140,18 @@ void iiwaRos::setPayload ( const geometry_msgs::PoseStamped& position )
   || ( servo_motion_service_.getControlModeActive() == 8 ) 
   )
   {
-    throw std::runtime_error( "FRI : TODO" );
+    std::cout << "setting the new payload..." << std::endl;
+    std::cout << position.pose << std::endl;
+    holder_command_payload_.set ( position );
+    holder_command_payload_.publishIfNew();
+    ros::Duration(3.).sleep();
   }
   else
   {
+    std::cout << "setting the new payload..." << std::endl;
     holder_command_payload_.set ( position );
     holder_command_payload_.publishIfNew();
+    ros::Duration(3.).sleep();
   }
 #else
     holder_command_payload_.set ( position );
