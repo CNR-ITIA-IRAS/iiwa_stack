@@ -138,7 +138,6 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
       {
         if( command_joint_position_.empty() )
         {
-          
           //std::cout << to_string( last_joint_pos_command_ ) << std::endl;
           robotCommand().setJointPosition( &joint_pos_command_[0] );
         }
@@ -148,6 +147,7 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
           robotCommand().setJointPosition( &joint_pos_command_[0] );
           command_joint_position_.pop_front();
         }
+//         std::cout <<"FRI positions: "<< joint_pos_command_[0] << "; " << joint_pos_command_[1] << "; " << joint_pos_command_[2] << "; " << joint_pos_command_[3] << "; " << joint_pos_command_[4] << "; " << joint_pos_command_[5] << "; " << joint_pos_command_[6] << "; " << std::endl;
       }
       else if( robotState().getClientCommandMode() == KUKA::FRI::TORQUE )
       {
