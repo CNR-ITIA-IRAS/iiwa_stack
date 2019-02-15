@@ -105,7 +105,7 @@ bool IIWA_HW::start() {
   device_->reset();
   
   // general joint to store information
-  boost::shared_ptr<const urdf::Joint> joint;
+  shared_ptr_namespace::shared_ptr<const urdf::Joint> joint;
   
   // create joint handles given the list
   for(int i = 0; i < IIWA_JOINTS; ++i) {
@@ -176,7 +176,7 @@ void IIWA_HW::registerJointLimits(const std::string& joint_name,
   bool has_soft_limits = false;
   
   if (urdf_model != NULL) {
-    const boost::shared_ptr<const urdf::Joint> urdf_joint = urdf_model->getJoint(joint_name);
+    const shared_ptr_namespace::shared_ptr<const urdf::Joint> urdf_joint = urdf_model->getJoint(joint_name);
     
     if (urdf_joint != NULL) {
       // Get limits from the URDF file.

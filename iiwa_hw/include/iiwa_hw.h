@@ -55,6 +55,18 @@
 #include <vector>
 #include <sstream>
 
+
+#if ROS_VERSION_MINIMUM(1, 14, 1)
+# include <memory>
+namespace shared_ptr_namespace = std;
+#else
+# include <boost/concept_check.hpp>
+# include <boost/graph/graph_concepts.hpp>
+# include <boost/enable_shared_from_this.hpp>
+namespace shared_ptr_namespace = boost;
+#endif
+
+
 constexpr int DEFAULT_CONTROL_FREQUENCY = 1000; // Hz
 constexpr int IIWA_JOINTS = 7;
 
@@ -192,7 +204,7 @@ private:
   joint_limits_interface::PositionJointSaturationInterface pj_sat_interface_;
   joint_limits_interface::PositionJointSoftLimitsInterface pj_limits_interface_;
   
-  boost::shared_ptr<IIWA_HW::IIWA_device> device_; /**< IIWA device. */
+  shared_ptr_namespace::shared_ptr<IIWA_HW::IIWA_device> device_; /**< IIWA device. */
   
   /** Objects to control send/receive rate. */
   ros::Time timer_;
