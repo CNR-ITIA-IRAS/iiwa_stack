@@ -201,133 +201,50 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
       last_joint_pos_command_ = joint_pos_command_ ;
     }
     
-//     virtual void command()
-//     {
-//       // the base method.
-//       
-//       auto const joint_pos_msr = robotState().getMeasuredJointPosition();
-//       auto const joint_pos_cmd_iiwa = robotState().getCommandedJointPosition();
-//       
-//       if (realtime_pub_.trylock())
-//       { 
-//         realtime_pub_.msg_.name     = {"a1_cmd", "a2_cmd", "a3_cmd", "a4_cmd","a5_cmd", "a6_cmd", "a7_cmd"
-//                                       ,"a1_msr", "a2_msr", "a3_msr", "a4_msr","a5_msr", "a6_msr", "a7_msr" 
-//                                       ,"a1_cmd_iiwa", "a2_cmd_iiwa", "a3_cmd_iiwa", "a4_cmd_iiwa","a5_cmd_iiwa", "a6_cmd_iiwa", "a7_cmd_iiwa" };
-//         realtime_pub_.msg_.position = {last_joint_pos_command_[0], last_joint_pos_command_[1], last_joint_pos_command_[2]
-//                                      , last_joint_pos_command_[3], last_joint_pos_command_[4], last_joint_pos_command_[5], last_joint_pos_command_[6]
-//                                      , joint_pos_msr[0], joint_pos_msr[1], joint_pos_msr[2]
-//                                      , joint_pos_msr[3], joint_pos_msr[4], joint_pos_msr[5], joint_pos_msr[6]
-//                                      , joint_pos_cmd_iiwa[0], joint_pos_cmd_iiwa[1], joint_pos_cmd_iiwa[2]
-//                                      , joint_pos_cmd_iiwa[3], joint_pos_cmd_iiwa[4], joint_pos_cmd_iiwa[5], joint_pos_cmd_iiwa[6] };
-//         
-//         realtime_pub_.msg_.header.stamp = ros::Time::now();
-//         
-//         realtime_pub_.unlockAndPublish();
-//       }
-// 
-//       if( robotState().getClientCommandMode() == KUKA::FRI::POSITION )
-//       {
-//         if( command_joint_position_.empty() )
-//         {
-//           
-//           //std::cout << to_string( last_joint_pos_command_ ) << std::endl;
-//           robotCommand().setJointPosition( &last_joint_pos_command_[0] );
-//         }
-//         else
-//         {
-//           //std::cout << to_string( last_joint_pos_command_ ) << std::endl;
-//           last_joint_pos_command_ = command_joint_position_.front();
-//           robotCommand().setJointPosition( &last_joint_pos_command_[0] );
-//           command_joint_position_.pop_front();
-//         }
-//       }
-//       else if( robotState().getClientCommandMode() == KUKA::FRI::TORQUE )
-//       {
-//         LBRClient::command();
-//         if( command_joint_torque_.empty() )
-//         {
-//           std::vector<double> zeroTorque(7,0);
-//           robotCommand().setTorque( &zeroTorque[0] );
-//         }
-//         else
-//         {
-//           //std::cout << to_string( last_joint_pos_command_ ) << std::endl;
-//           last_joint_torque_command_ = command_joint_torque_.front();
-//           robotCommand().setTorque( &last_joint_torque_command_[0] );
-//           command_joint_torque_.pop_front();
-//         }
-//       }
-//       else if ( robotState().getClientCommandMode() == KUKA::FRI::WRENCH )
-//       {
-//         LBRClient::command();
-//         if( command_wrench_.empty() )
-//         {
-//           std::vector<double> zeroWrench(6,0);
-//           robotCommand().setWrench( &zeroWrench[0] );
-//         }
-//         else
-//         {
-//           last_wrench_command_ = command_wrench_.front();
-//           robotCommand().setWrench( &last_wrench_command_[0] );
-//           command_wrench_.pop_front();
-//         } 
-//       }
-//     }
-    
-      void newJointPosCommand( const std::vector< double >& new_joint_pos_command ) 
+    void newJointPosCommand( const std::vector< double >& new_joint_pos_command ) 
+    {
+      while( robotState().getSessionState() != KUKA::FRI::COMMANDING_ACTIVE )
       {
-        while( robotState().getSessionState() != KUKA::FRI::COMMANDING_ACTIVE )
+        ros::Duration(0.005).sleep();
+      }
+      
+
+      double start = ros::WallTime::now().toSec();
+      
+      while( ros::ok() )
+      {  
+        if( robotState().getClientCommandMode() == KUKA::FRI::POSITION )
         {
-          ros::Duration(0.005).sleep();
+          break;
         }
         
-        if( robotState().getClientCommandMode() != KUKA::FRI::POSITION )
+        ros::Duration(0.0005).sleep();
+        double end   = ros::WallTime::now().toSec();
+        if( end-start > 2e-3 )
         {
           ROS_WARN_STREAM(ros::Time::now() << " fri_client.h - wrong command state in newJointPosCommand ");
           return;
         }
+      }
 
-        if( new_joint_pos_command.size() != KUKA::FRI::LBRState::NUMBER_OF_JOINTS )
-        {
-          throw std::runtime_error("Mismatch of New Command Vector"); 
-        }
-        if( command_joint_position_.empty() )
+      if( new_joint_pos_command.size() != KUKA::FRI::LBRState::NUMBER_OF_JOINTS )
+      {
+        throw std::runtime_error("Mismatch of New Command Vector"); 
+      }
+      if( command_joint_position_.empty() )
+      {
+        command_joint_position_.push_back( new_joint_pos_command );
+      }
+      else
+      {
+        std::vector<double> command_joint_position = command_joint_position_.back();
+        if( diff( command_joint_position, new_joint_pos_command ) > 0.001 * M_PI / 180.0 )
         {
           command_joint_position_.push_back( new_joint_pos_command );
         }
-        else
-        {
-          std::vector<double> command_joint_position = command_joint_position_.back();
-          if( diff( command_joint_position, new_joint_pos_command ) > 0.001 * M_PI / 180.0 )
-          {
-            command_joint_position_.push_back( new_joint_pos_command );
-          }
-        }
-        return;
       }
-    
-//     void newJointPosCommand( const std::vector< double >& new_joint_pos_command ) 
-//     {
-//       while( robotState().getSessionState() != KUKA::FRI::COMMANDING_ACTIVE )
-//       {
-//         ros::Duration(0.005).sleep();
-//       }
-//       
-//       if( robotState().getClientCommandMode() != KUKA::FRI::POSITION )
-//       {
-//         ROS_WARN_STREAM(ros::Time::now() << " fri_client.h - wrong command state in newJointPosCommand ");
-//         return;
-//       }
-// 
-//       if( new_joint_pos_command.size() != KUKA::FRI::LBRState::NUMBER_OF_JOINTS )
-//       {
-//         throw std::runtime_error("Mismatch of New Command Vector"); 
-//       }
-// 
-//       command_joint_position_.push_back( new_joint_pos_command );
-// 
-//       return;
-//     }
+      return;
+    }
     
     void newJointTorqueCommand( const std::vector< double >& new_joint_torque_command ) 
     {

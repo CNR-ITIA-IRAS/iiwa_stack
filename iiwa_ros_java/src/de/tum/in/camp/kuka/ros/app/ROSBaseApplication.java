@@ -215,8 +215,8 @@ public abstract class ROSBaseApplication extends RoboticsAPIApplication {
 		Logger.info("Starting the ROS control loop...");
 		
 		try {
-			while(running) { 
-				
+			while(running) {
+
 				decimationCounter++;
 
 				// This will publish the current robot state on the various ROS topics.
@@ -224,17 +224,17 @@ public abstract class ROSBaseApplication extends RoboticsAPIApplication {
 
 				if ((decimationCounter % controlDecimation) == 0)
 					controlLoop();  // Perform control loop specified by subclass
-			} 
+			}
 		}
 		catch (Exception e) {
 			Logger.info("ROS control loop aborted. " + e.toString());
-		} finally {	        
+		} finally {
 			Logger.info("ROS control Ending Procedures.");
 			cleanedup = cleanup();
 			Logger.info("ROS control loop has ended. Application terminated.");
 		}
 	}
-	
+
 	@Override
 	public void dispose() {
 		Logger.info("Dispose Application");

@@ -112,10 +112,11 @@ bool iiwaRos::getJointDamping ( iiwa_msgs::JointDamping& value )
 void iiwaRos::setCartesianPose ( const geometry_msgs::PoseStamped& position )
 {
 #if defined( ENABLE_FRI )
-  if(( servo_motion_service_.getControlModeActive() == 5 )
-  || ( servo_motion_service_.getControlModeActive() == 6 )
-  || ( servo_motion_service_.getControlModeActive() == 7 )
-  || ( servo_motion_service_.getControlModeActive() == 8 ) 
+  int control_modality_active = servo_motion_service_.getControlModeActive();
+  if(( control_modality_active == 5 )
+  || ( control_modality_active == 6 )
+  || ( control_modality_active == 7 )
+  || ( control_modality_active == 8 ) 
   )
   {
     throw std::runtime_error( "FRI : TODO" );
@@ -134,10 +135,11 @@ void iiwaRos::setCartesianPose ( const geometry_msgs::PoseStamped& position )
 void iiwaRos::setPayload ( const geometry_msgs::PoseStamped& position )
 {
 #if defined( ENABLE_FRI )
-  if(( servo_motion_service_.getControlModeActive() == 5 )
-  || ( servo_motion_service_.getControlModeActive() == 6 )
-  || ( servo_motion_service_.getControlModeActive() == 7 )
-  || ( servo_motion_service_.getControlModeActive() == 8 ) 
+  int control_modality_active = servo_motion_service_.getControlModeActive();
+  if(( control_modality_active == 5 )
+  || ( control_modality_active == 6 )
+  || ( control_modality_active == 7 )
+  || ( control_modality_active == 8 ) 
   )
   {
     std::cout << "setting the new payload..." << std::endl;
@@ -198,8 +200,10 @@ void iiwaRos::setWrench ( const iiwa_msgs::CartesianQuantity& wrench )
 void iiwaRos::setJointPosition ( const iiwa_msgs::JointPosition& position, double goal_tolerance )
 {
 #if defined( ENABLE_FRI )
-  if( ( servo_motion_service_.getControlModeActive() == 5 )
-  ||  ( servo_motion_service_.getControlModeActive() == 7 ) )
+
+  int control_modality_active = servo_motion_service_.getControlModeActive();
+  if( ( control_modality_active == 5 )
+  ||  ( control_modality_active == 7 ) )
   {
     servo_motion_service_.getFriClient()->newJointPosCommand( position );
   }
@@ -235,9 +239,10 @@ void iiwaRos::setJointPosition ( const iiwa_msgs::JointPosition& position, doubl
 void iiwaRos::setJointVelocity ( const iiwa_msgs::JointVelocity& velocity )
 {
 #if defined( ENABLE_FRI )
-  if( ( servo_motion_service_.getControlModeActive() == 5 )
-  ||  ( servo_motion_service_.getControlModeActive() == 6 ) 
-  ||  ( servo_motion_service_.getControlModeActive() == 7 ) )
+  int control_modality_active = servo_motion_service_.getControlModeActive();
+  if( ( control_modality_active == 5 )
+  ||  ( control_modality_active == 6 ) 
+  ||  ( control_modality_active == 7 ) )
   {
     throw std::runtime_error( "FRI : TODO" );
   }
@@ -255,9 +260,10 @@ void iiwaRos::setJointVelocity ( const iiwa_msgs::JointVelocity& velocity )
 void iiwaRos::setJointPositionVelocity ( const iiwa_msgs::JointPositionVelocity& value )
 {
 #if defined( ENABLE_FRI )
-  if( ( servo_motion_service_.getControlModeActive() == 5 )
-  ||  ( servo_motion_service_.getControlModeActive() == 6 ) 
-  ||  ( servo_motion_service_.getControlModeActive() == 7 ) )
+  int control_modality_active = servo_motion_service_.getControlModeActive();
+  if( ( control_modality_active == 5 )
+  ||  ( control_modality_active == 6 ) 
+  ||  ( control_modality_active == 7 ) )
   {
     throw std::runtime_error( "FRI : TODO" );
   }
