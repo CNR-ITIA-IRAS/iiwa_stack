@@ -44,8 +44,24 @@
 #include <iiwa_ros/servo_motion_service.h>
 #include <iiwa_ros/path_parameters_service.h>
 #include <iiwa_ros/time_to_destination_service.h>
+#include <iiwa_ros/conversions.h>
 #include <ros/ros.h>
 
+#include <kdl_parser/kdl_parser.hpp>
+#include <kdl/chain.hpp>
+#include <kdl/jntarray.hpp>
+#include <kdl/jacobian.hpp>
+#include <kdl/frames.hpp>
+#include <kdl/chainfksolver.hpp>
+#include <kdl/chainfksolverpos_recursive.hpp>
+#include <kdl/chainjnttojacsolver.hpp>
+#include <kdl/frames_io.hpp>
+#include <eigen_conversions/eigen_kdl.h>
+#include <eigen_conversions/eigen_msg.h>
+#include <stdio.h>
+#include <iostream>
+
+#include <eigen3/Eigen/Core>
 #include <string>
 #include <mutex>
 
@@ -200,7 +216,7 @@ namespace iiwa_ros
      * @param value the current cartesian wrench of the robot.
      * @return bool
      */
-    bool getCartesianWrench(geometry_msgs::WrenchStamped& value);
+    bool getCartesianWrench(geometry_msgs::WrenchStamped& value, const char what = 'e' );
     
     /**
      * @brief Returns true is a new Joint velocity of the robot is available.
@@ -225,6 +241,8 @@ namespace iiwa_ros
      * @return bool
      */
     bool getJointDamping(iiwa_msgs::JointDamping& value);
+
+    bool getJacobian(Eigen::MatrixXd& value);
     
     /**
      * @brief Returns the object that allows to call the configureSmartServo service.
@@ -264,7 +282,7 @@ namespace iiwa_ros
      * @param position the joint position to set the robot.
      * @return void
      */
-    void setJointPosition(const iiwa_msgs::JointPosition& position, double goal_tolerance = 99999.0 );
+    bool setJointPosition(const iiwa_msgs::JointPosition& position );
     
     void setJointTorque(const iiwa_msgs::JointTorque& torque );
     
@@ -290,6 +308,7 @@ namespace iiwa_ros
      * \brief Returns the current connection status of an IIWA robot.
      */
     bool getRobotIsConnected();
+    bool isFRIModalityActive();
     
   private:
     iiwaStateHolder<geometry_msgs::PoseStamped> holder_state_pose_;
@@ -312,7 +331,98 @@ namespace iiwa_ros
     PathParametersService path_parameters_service_;
     TimeToDestinationService time_to_destination_service_;
 
-    
+
+
   };
-  
+
+
+bool CHECK_CLOCK(const ros::Time& what, const std::string& msg)
+{
+  ros::Time act = ros::Time::now();
+  if( (act-what).toSec() > 0.5 )
+  {
+    ROS_WARN("%s High communication latency....(%f,%f)",msg.c_str(), what.toSec(), act.toSec() );
+    return true;
+  }
+  return true;
+}
+
+
+class iiwaState
+{
+    bool            running_;
+
+    iiwa_msgs::JointPosition      q_msg_;
+    iiwa_msgs::JointVelocity      dq_msg_;
+    iiwa_msgs::JointTorque        tau_msg_;
+    geometry_msgs::WrenchStamped  wrench_;
+
+    Eigen::VectorXd q_;
+    Eigen::VectorXd dq_;
+    Eigen::VectorXd tau_;
+    Eigen::Affine3d pose_;
+    Eigen::VectorXd twist_;
+    Eigen::Vector3d vel_;
+    Eigen::Vector3d omega_;
+    Eigen::MatrixXd jacobian_;
+    Eigen::Vector3d f_ee_;
+    Eigen::Vector3d f_b_;
+    Eigen::Vector3d f0_;
+
+    Eigen::Vector3d tau_ee_;
+    Eigen::Vector3d tau_b_;
+    Eigen::Vector3d tau0_;
+
+    bool            first_q_;
+    bool            first_run_;
+    std::mutex      mtx_;
+
+    ros::Subscriber sub_joint_position;
+    ros::Subscriber sub_joint_velocity;
+    ros::Subscriber sub_joint_torque;
+    ros::Subscriber sub_cart_wrench;
+
+    KDL::Tree iiwa_tree_;
+    KDL::Chain iiwa_chain_;
+    std::shared_ptr< KDL::ChainFkSolverPos_recursive > fksolver_;
+    std::shared_ptr< KDL::ChainJntToJacSolver        > jacsolver_;
+
+    void iiwaStateJointPosition(const iiwa_msgs::JointPositionConstPtr& msg );
+    void iiwaStateJointVelocity(const iiwa_msgs::JointVelocityConstPtr& msg );
+    void iiwaStateJointTorque(const iiwa_msgs::JointTorqueConstPtr& msg );
+    void iiwaStateWrench(const geometry_msgs::WrenchStampedConstPtr& msg );
+
+  public:
+
+    Eigen::MatrixXd M,C,K;
+
+
+    iiwaState ( const std::string& robot_description
+              , const std::string &chain_root
+              , const std::string &chain_tip
+              , const Eigen::VectorXd& m, const Eigen::VectorXd& c, const Eigen::VectorXd& k );
+    ~iiwaState( );
+
+
+    bool getJointPosition(iiwa_msgs::JointPosition& jp);
+    bool getJointPosition(Eigen::VectorXd& q);
+    bool GetCartesianPose( Eigen::Affine3d& cp);
+    bool getCartesianPoseVector(Eigen::VectorXd& x_msr);
+    bool getRotation( Eigen::Matrix3d& R  );
+    bool getQuaternion( Eigen::Quaterniond& quat );
+    bool getCartesianPoint( Eigen::Vector3d& point );
+    bool getWrench( Eigen::VectorXd& ret, const char what = 'e' );
+    bool getForce( Eigen::Vector3d& ret, const char what = 'e' );
+    bool getTorque( Eigen::Vector3d& ret, const char what = 'e' );
+    bool getTwist( Eigen::VectorXd&  ret );
+    bool getVelocity( Eigen::Vector3d& vel );
+    bool getOmega( Eigen::Vector3d& omega );
+    bool getMatrix( Eigen::Matrix3d& ret , const char what, const char translation );
+    bool toJointVelocity(const Eigen::Vector3d& velocity, const Eigen::Vector3d& omega, Eigen::VectorXd& ret);
+    bool toJointVelocity(const Eigen::VectorXd& q, const Eigen::Vector3d& velocity, const Eigen::Vector3d& omega, Eigen::VectorXd& ret);
+    bool isRunning() const;
+
+  };
+
+
 }

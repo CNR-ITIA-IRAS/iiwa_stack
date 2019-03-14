@@ -24,11 +24,19 @@
 #pragma once
 
 #include <iiwa_msgs/JointQuantity.h>
+#include <iiwa_msgs/JointVelocity.h>
 #include <iiwa_msgs/CartesianQuantity.h>
 
 #if defined( ENABLE_FRI )
   #include <iiwa_fri/friLBRState.h>
 #endif
+
+#include <geometry_msgs/TwistStamped.h>
+#include <geometry_msgs/WrenchStamped.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <eigen3/Eigen/Core>
+#include <eigen3/Eigen/Dense>
+#include <eigen_conversions/eigen_kdl.h>
 
 namespace iiwa_ros 
 {
@@ -40,7 +48,7 @@ namespace iiwa_ros
    * @param value the value to use for all the JointQuantity components.
    * @return iiwa_msgs::JointQuantity
    */
-  iiwa_msgs::JointQuantity jointQuantityFromDouble(const double value) {
+  inline iiwa_msgs::JointQuantity jointQuantityFromDouble(const double value) {
     iiwa_msgs::JointQuantity quantity;
     quantity.a1 = value;
     quantity.a2 = value;
@@ -64,7 +72,7 @@ namespace iiwa_ros
    * @param a7
    * @return iiwa_msgs::JointQuantity
    */
-  iiwa_msgs::JointQuantity jointQuantityFromDouble(const double a1, const double a2, const double a3, const double a4, const double a5, const double a6, const double a7) {
+  inline iiwa_msgs::JointQuantity jointQuantityFromDouble(const double a1, const double a2, const double a3, const double a4, const double a5, const double a6, const double a7) {
     iiwa_msgs::JointQuantity quantity;
     quantity.a1 = a1;
     quantity.a2 = a2;
@@ -82,7 +90,7 @@ namespace iiwa_ros
    * @param value the value to use for all the CartesianQuantity components.
    * @return iiwa_msgs::CartesianQuantity
    */
-  iiwa_msgs::CartesianQuantity CartesianQuantityFromDouble(const double value) {
+  inline iiwa_msgs::CartesianQuantity CartesianQuantityFromDouble(const double value) {
     iiwa_msgs::CartesianQuantity quantity;
     quantity.x = value;
     quantity.y = value;
@@ -104,7 +112,7 @@ namespace iiwa_ros
    * @param c 
    * @return iiwa_msgs::CartesianQuantity
    */
-  iiwa_msgs::CartesianQuantity CartesianQuantityFromDouble(const double x, const double y, const double z, const double a, const double b, const double c) {
+  inline iiwa_msgs::CartesianQuantity CartesianQuantityFromDouble(const double x, const double y, const double z, const double a, const double b, const double c) {
     iiwa_msgs::CartesianQuantity quantity;
     quantity.x = x;
     quantity.y = y;
@@ -122,7 +130,7 @@ namespace iiwa_ros
    * @param rotation_value value to use for all the rotational components (a,b,c) of the CartesianQuantity
    * @return iiwa_msgs::CartesianQuantity
    */
-  iiwa_msgs::CartesianQuantity CartesianQuantityFromDouble(const double translation_value, const double rotation_value) {
+  inline iiwa_msgs::CartesianQuantity CartesianQuantityFromDouble(const double translation_value, const double rotation_value) {
     iiwa_msgs::CartesianQuantity quantity;
     quantity.x = translation_value;
     quantity.y = translation_value;
@@ -133,7 +141,7 @@ namespace iiwa_ros
     return quantity;
   }
   
-  std::vector<double> jointPositionToVector(const iiwa_msgs::JointQuantity& quantity) {
+  inline std::vector<double> jointPositionToVector(const iiwa_msgs::JointQuantity& quantity) {
     std::vector<double> ret(KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0);
     ret[0] = quantity.a1;
     ret[1] = quantity.a2;
@@ -144,4 +152,132 @@ namespace iiwa_ros
     ret[6] = quantity.a7;
     return ret;
   }
+
+
+
+  inline void eigenVectorToIiwaJointPosition( const Eigen::VectorXd& in, iiwa_msgs::JointPosition& out )
+  {
+      out.header.stamp = ros::Time::now();
+
+      out.position.a1  = in(0);
+      out.position.a2  = in(1);
+      out.position.a3  = in(2);
+      out.position.a4  = in(3);
+      out.position.a5  = in(4);
+      out.position.a6  = in(5);
+      out.position.a7  = in(6);
+  }
+  inline void iiwaJointPositionToEigenVector( const iiwa_msgs::JointPosition& in, Eigen::VectorXd& out )
+  {
+      out.resize(7);
+      out.setZero();
+      out(0) = in.position.a1;
+      out(1) = in.position.a2;
+      out(2) = in.position.a3;
+      out(3) = in.position.a4;
+      out(4) = in.position.a5;
+      out(5) = in.position.a6;
+      out(6) = in.position.a7;
+  }
+  inline void iiwaJointVelocityToEigenVector( const iiwa_msgs::JointVelocity& in, Eigen::VectorXd& out )
+  {
+      out.resize(7);
+      out.setZero();
+      out(0) = in.velocity.a1;
+      out(1) = in.velocity.a2;
+      out(2) = in.velocity.a3;
+      out(3) = in.velocity.a4;
+      out(4) = in.velocity.a5;
+      out(5) = in.velocity.a6;
+      out(6) = in.velocity.a7;
+  }
+
+  inline void iiwaJointTorqueToEigenVector( const iiwa_msgs::JointTorque& in, Eigen::VectorXd& out )
+  {
+      out.resize(7);
+      out.setZero();
+      out(0) = in.torque.a1;
+      out(1) = in.torque.a2;
+      out(2) = in.torque.a3;
+      out(3) = in.torque.a4;
+      out(4) = in.torque.a5;
+      out(5) = in.torque.a6;
+      out(6) = in.torque.a7;
+  }
+
+  inline geometry_msgs::WrenchStamped toWrenchStamped(const Eigen::VectorXd& wrench)
+  {
+      geometry_msgs::WrenchStamped msg;
+
+      msg.header.stamp = ros::Time::now();
+
+      msg.wrench.force.x = wrench(0);
+      msg.wrench.force.y = wrench(1);
+      msg.wrench.force.z = wrench(2);
+
+      msg.wrench.torque.x = wrench(3);
+      msg.wrench.torque.y = wrench(4);
+      msg.wrench.torque.z = wrench(5);
+
+      return msg;
+  }
+
+  inline geometry_msgs::TwistStamped toTwistStamped(const Eigen::VectorXd& velocity)
+  {
+      geometry_msgs::TwistStamped msg;
+
+      msg.header.stamp = ros::Time::now();
+
+      msg.twist.linear.x = velocity(0);
+      msg.twist.linear.y = velocity(1);
+      msg.twist.linear.z = velocity(2);
+
+      msg.twist.angular.x = velocity(3);
+      msg.twist.angular.y = velocity(4);
+      msg.twist.angular.z = velocity(5);
+
+      return msg;
+  }
+
+  inline geometry_msgs::TwistStamped toPoseStamped(const Eigen::Vector3d& t,const Eigen::Vector3d& r)
+  {
+      geometry_msgs::TwistStamped msg;
+
+      msg.header.stamp = ros::Time::now();
+
+      msg.twist.linear.x = t(0);
+      msg.twist.linear.y = t(1);
+      msg.twist.linear.z = t(2);
+
+      msg.twist.angular.x = r(0);
+      msg.twist.angular.y = r(1);
+      msg.twist.angular.z = r(2);
+
+      return msg;
+  }
+
+  inline Eigen::VectorXd poseToVec(const geometry_msgs::PoseStamped p)
+  {
+    Eigen::VectorXd v(6);
+
+    v(0) = p.pose.position.x;
+    v(1) = p.pose.position.y;
+    v(2) = p.pose.position.z;
+
+    double sinr = +2.0 * (p.pose.orientation.w * p.pose.orientation.x + p.pose.orientation.y * p.pose.orientation.z);
+    double cosr = +1.0 - 2.0 * (p.pose.orientation.x * p.pose.orientation.x + p.pose.orientation.y * p.pose.orientation.y);
+    v(3) = atan2(sinr, cosr);
+
+    double sinp = +2.0 * (p.pose.orientation.w * p.pose.orientation.y - p.pose.orientation.z * p.pose.orientation.x);
+    if (fabs(sinp) >= 1)
+      v(4) = copysign(M_PI / 2, sinp); // use 90 degrees if out of range
+    else
+      v(4) = asin(sinp);
+
+    double siny = +2.0 * (p.pose.orientation.w * p.pose.orientation.z + p.pose.orientation.x * p.pose.orientation.y);
+    double cosy = +1.0 - 2.0 * (p.pose.orientation.y * p.pose.orientation.y + p.pose.orientation.z * p.pose.orientation.z);
+    v(5) = atan2(siny, cosy);
+    return v;
+  }
+
 }

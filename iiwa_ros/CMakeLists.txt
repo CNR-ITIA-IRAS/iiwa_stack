@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.8.3)
 project(iiwa_ros)
 
 set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
+set(CMAKE_BUILD_TYPE Debug)
 
 option( ENABLE_FRI "Enable the FRI client" ON )
 
@@ -19,6 +20,9 @@ find_package(catkin REQUIRED COMPONENTS
   realtime_tools
 )
 
+find_package(Boost REQUIRED system filesystem date_time thread )
+find_package(Eigen3)
+
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES	 ${PROJECT_NAME}
@@ -28,7 +32,7 @@ catkin_package(
 )
 
 ## Specify additional locations of header files
-include_directories(include ${catkin_INCLUDE_DIRS} ${KUKA_FRI_INCLUDE} )
+include_directories(include ${catkin_INCLUDE_DIRS} ${KUKA_FRI_INCLUDE} ${EIGEN3_INCLUDE_DIR} )
 
 ## Declare a cpp library
 add_library(${PROJECT_NAME}
@@ -36,6 +40,7 @@ add_library(${PROJECT_NAME}
   src/servo_motion_service.cpp
   src/path_parameters_service.cpp
   src/time_to_destination_service.cpp
+  src/fri_client.cpp
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
