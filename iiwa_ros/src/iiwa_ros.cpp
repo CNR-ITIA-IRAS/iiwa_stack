@@ -253,7 +253,6 @@ bool iiwaRos::setJointPosition ( const iiwa_msgs::JointPosition& position )
 {
 
 #if defined( ENABLE_FRI )
-
   if( isFRIModalityActive() )
   {
     return servo_motion_service_.getFRIApp( )->getFRIClient().newJointPosCommand( position );

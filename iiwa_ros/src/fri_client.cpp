@@ -205,7 +205,8 @@ bool LBRJointOverlayClient::newJointPosCommand( const std::vector< double >& new
 
   if( new_joint_pos_command.size() != KUKA::FRI::LBRState::NUMBER_OF_JOINTS )
   {
-    throw std::runtime_error("Mismatch of New Command Vector");
+    return false;
+    // throw std::runtime_error("Mismatch of New Command Vector");
   }
   if( command_joint_position_.empty() )
   {
@@ -219,7 +220,6 @@ bool LBRJointOverlayClient::newJointPosCommand( const std::vector< double >& new
       command_joint_position_.push_back( new_joint_pos_command );
     }
   }
-  //ROS_INFO("<<<<<<<<<<<<< newJointPosCommand");
   return true;
 }
 
@@ -233,6 +233,7 @@ bool LBRJointOverlayClient::newJointPosCommand( const iiwa_msgs::JointPosition& 
   new_joint_pos_command[4] = position.position.a5;
   new_joint_pos_command[5] = position.position.a6;
   new_joint_pos_command[6] = position.position.a7;
+  
   return newJointPosCommand( new_joint_pos_command );
 }
 
@@ -632,6 +633,7 @@ void LBROverlayApp::step()
          case KUKA::FRI::POOR      : ROS_FATAL_THROTTLE(5, "** POOR ** FRI COMMUNICATION STATE     " ); break;
          case KUKA::FRI::FAIR      : ROS_WARN_THROTTLE (5, "** FAIR ** FRI COMMUNICATION STATE     " ); break;
          case KUKA::FRI::GOOD      : ROS_WARN_THROTTLE (5, "** GOOD ** FRI COMMUNICATION STATE     " ); break;
+         case KUKA::FRI::EXCELLENT : ROS_INFO_THROTTLE (5, "** EXCELLENT** FRI COMMUNICATION STATE     " ); break;
       }
       KUKA::FRI::ESessionState oldState, newState;
       client_.getState(oldState,newState);
