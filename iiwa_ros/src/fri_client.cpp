@@ -7,6 +7,7 @@
 #include <sensor_msgs/JointState.h>
 
 #include <ros/ros.h>
+#include <std_msgs/Int16.h>
 #include <iiwa_msgs/JointQuantity.h>
 #include <iiwa_msgs/JointPosition.h>
 #include <iiwa_msgs/JointVelocity.h>
@@ -68,6 +69,7 @@ LBRJointOverlayClient::LBRJointOverlayClient( const std::string& robot_descripti
   fksolver_.reset( new KDL::ChainFkSolverPos_recursive( iiwa_chain_ ) );
   jacsolver_.reset( new KDL::ChainJntToJacSolver( iiwa_chain_ ) );
 
+  // logger = std::thread( &LBRJointOverlayClient::loggerThread, this);
 }
 
 LBRJointOverlayClient::~LBRJointOverlayClient( ) { }
@@ -198,11 +200,32 @@ void LBRJointOverlayClient::command()
     realtime_pub_.unlockAndPublish();
   }
   last_joint_pos_command_ = joint_pos_command_ ;
+
+
 }
+
+
+void LBRJointOverlayClient::loggerThread()
+{
+
+  ros::NodeHandle nh("~");
+  ros::Publisher logger_pub = nh.advertise<std_msgs::Int16>("iiwa_line_logger", 10000);
+  while( ros::ok() )
+  {
+    std_msgs::Int16 data_log;
+    data_log.data =line_;
+    logger_pub.publish( data_log );
+    ros::spinOnce();
+    ros::Duration(0.001).sleep();
+  }
+
+}
+
 
 bool LBRJointOverlayClient::newJointPosCommand( const std::vector< double >& new_joint_pos_command )
 {
 
+  line_ = __LINE__;
   if( new_joint_pos_command.size() != KUKA::FRI::LBRState::NUMBER_OF_JOINTS )
   {
     return false;
@@ -210,14 +233,20 @@ bool LBRJointOverlayClient::newJointPosCommand( const std::vector< double >& new
   }
   if( command_joint_position_.empty() )
   {
+    line_ = __LINE__;
     command_joint_position_.push_back( new_joint_pos_command );
+    line_ = __LINE__;
   }
   else
   {
+    line_ = __LINE__;
     std::vector<double> command_joint_position = command_joint_position_.back();
+    line_ = __LINE__;
     if( diff( command_joint_position, new_joint_pos_command ) > 0.001 * M_PI / 180.0 )
     {
+      line_ = __LINE__;
       command_joint_position_.push_back( new_joint_pos_command );
+      line_ = __LINE__;
     }
   }
   return true;
@@ -225,14 +254,16 @@ bool LBRJointOverlayClient::newJointPosCommand( const std::vector< double >& new
 
 bool LBRJointOverlayClient::newJointPosCommand( const iiwa_msgs::JointPosition& position )
 {
+  line_ = __LINE__;
   std::vector<double> new_joint_pos_command( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 );
-  new_joint_pos_command[0] = position.position.a1;
-  new_joint_pos_command[1] = position.position.a2;
-  new_joint_pos_command[2] = position.position.a3;
-  new_joint_pos_command[3] = position.position.a4;
-  new_joint_pos_command[4] = position.position.a5;
-  new_joint_pos_command[5] = position.position.a6;
-  new_joint_pos_command[6] = position.position.a7;
+  line_ = __LINE__;
+  new_joint_pos_command[0] = position.position.a1; line_ = __LINE__;
+  new_joint_pos_command[1] = position.position.a2; line_ = __LINE__;
+  new_joint_pos_command[2] = position.position.a3; line_ = __LINE__;
+  new_joint_pos_command[3] = position.position.a4; line_ = __LINE__;
+  new_joint_pos_command[4] = position.position.a5; line_ = __LINE__;
+  new_joint_pos_command[5] = position.position.a6; line_ = __LINE__;
+  new_joint_pos_command[6] = position.position.a7; line_ = __LINE__;
   
   return newJointPosCommand( new_joint_pos_command );
 }

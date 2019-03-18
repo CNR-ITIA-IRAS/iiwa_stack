@@ -37,8 +37,9 @@ ros::Time last_update_time;
 
 iiwaRos::iiwaRos() { }
 
-void iiwaRos::init(const bool verbosity)
+void iiwaRos::init(double fri_cycle_time, const bool verbosity)
 {
+  dt_ = fri_cycle_time;
     holder_state_pose_.init ( "state/CartesianPose" );
     holder_state_joint_position_.init ( "state/JointPosition" );
     holder_state_joint_torque_.init ( "state/JointTorque" );

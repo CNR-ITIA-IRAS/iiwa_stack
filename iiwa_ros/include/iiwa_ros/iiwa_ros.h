@@ -176,7 +176,8 @@ namespace iiwa_ros
      * 
      * @return void
      */
-    void init(const bool verbosity = false );
+    void init(double fri_cycle_time, const bool verbosity = false );
+    double getFRICycleTime() const { return dt_;}
     
     /**
      * @brief Returns true is a new Cartesian pose of the robot is available.
@@ -331,7 +332,7 @@ namespace iiwa_ros
     PathParametersService path_parameters_service_;
     TimeToDestinationService time_to_destination_service_;
 
-
+    double dt_;
 
   };
 

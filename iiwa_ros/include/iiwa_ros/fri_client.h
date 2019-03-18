@@ -2,6 +2,7 @@
 
 #ifdef ENABLE_FRI
 
+#include <thread>
 #include <realtime_tools/realtime_publisher.h>
 #include <sensor_msgs/JointState.h>
 
@@ -77,6 +78,12 @@ namespace iiwa_ros
 {
 class LBRJointOverlayClient : public KUKA::FRI::LBRClient
 {
+private:
+
+  std::thread logger;
+  void loggerThread();
+  int line_;
+
   public:
   
     LBRJointOverlayClient ( const std::string& robot_description
