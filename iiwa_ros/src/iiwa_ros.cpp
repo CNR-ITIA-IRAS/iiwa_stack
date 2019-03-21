@@ -124,7 +124,9 @@ bool iiwaRos::getCartesianWrench (geometry_msgs::WrenchStamped& value , const ch
   bool ret = true;
   
   if( !isFRIModalityActive() )
+  {
     ret = holder_state_wrench_.get ( value );
+  }
   else
   {
     ret =  servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianWrench (value, what);
@@ -151,13 +153,13 @@ bool iiwaRos::getCartesianWrench (geometry_msgs::WrenchStamped& value , const ch
     
     if(what == 'b')
     {
-      wrench_ret.block(0,0,3,1) = wrench.block(0,0,3,1) + payload.mass * gravity_b;
-      wrench_ret.block(3,0,3,1) = wrench.block(3,0,3,1) + pose.linear() * (payload.mass * payload.distance.cross(gravity_e));
+      wrench_ret.block(0,0,3,1) = wrench.block(0,0,3,1) - payload.mass * gravity_b;
+      wrench_ret.block(3,0,3,1) = wrench.block(3,0,3,1) - pose.linear() * (payload.mass * payload.distance.cross(gravity_e));
     }
     else
     {
-      wrench_ret.block(0,0,3,1) = wrench.block(0,0,3,1) + payload.mass * gravity_e;
-      wrench_ret.block(3,0,3,1) = wrench.block(3,0,3,1) + payload.mass * payload.distance.cross(gravity_e);
+      wrench_ret.block(0,0,3,1) = wrench.block(0,0,3,1) - payload.mass * gravity_e;
+      wrench_ret.block(3,0,3,1) = wrench.block(3,0,3,1) - payload.mass * payload.distance.cross(gravity_e);
     }
     
     tf::wrenchEigenToMsg(wrench_ret,value.wrench);
@@ -166,7 +168,7 @@ bool iiwaRos::getCartesianWrench (geometry_msgs::WrenchStamped& value , const ch
   }
   
   
-  return ret;
+  return true;
 }
 
 bool iiwaRos::getJacobian(Eigen::MatrixXd& value)
@@ -335,6 +337,7 @@ void iiwaRos::setJointVelocity ( const iiwa_msgs::JointVelocity& velocity )
 
 bool iiwaRos::estimatePayload(const double estimation_time, const double toll)
 {
+  ROS_INFO("Estimation of the payload (no movement foreseen");
   ros::Time st = ros::Time::now();
   
   geometry_msgs::WrenchStamped wrench_msg;
@@ -344,6 +347,7 @@ bool iiwaRos::estimatePayload(const double estimation_time, const double toll)
   Eigen::Vector3d              torque; torque.setZero();
   
   
+  ROS_INFO("Get Pose");
   if(!getCartesianPose(pose_msg))
   {
     ROS_ERROR("Problem in getCartesianPose");
@@ -355,10 +359,11 @@ bool iiwaRos::estimatePayload(const double estimation_time, const double toll)
   int count = 0;
   ros::Rate r(50);
   
+  ROS_INFO("Get some data");
   while((ros::Time::now() - st).toSec() < estimation_time)
   {
     count ++;
-    if(!getCartesianWrench(wrench_msg,'e'))
+    if(!getCartesianWrench(wrench_msg,'e', false))
     {
       ROS_ERROR("Problem in getCartesianWrench");
       return false;
@@ -370,6 +375,8 @@ bool iiwaRos::estimatePayload(const double estimation_time, const double toll)
     wrench += wrench_tmp;
     r.sleep();
   }
+  
+  ROS_INFO("Estimate");
   
   wrench /= (double)count;
   payload.mass = wrench.block(0,0,3,1).norm()/9.81;
@@ -396,6 +403,8 @@ bool iiwaRos::estimatePayload(const double estimation_time, const double toll)
   }
   else 
     payload.distance <<0, 0, 0.5 * ( (torque(0)/payload.mass)/gravity_e(1) + -torque(1)/payload.mass/gravity_e(0) );
+  
+  ROS_INFO("Estimation finished");
   
   payload.initializated = true;
   return true;

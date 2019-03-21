@@ -269,7 +269,7 @@ namespace iiwa_ros
      */
     TimeToDestinationService getTimeToDestinationService() { return time_to_destination_service_; };
     
-    bool payloadInitialized(){return payload.initializated; };
+    bool payloadInitialized() const {return payload.initializated; };
     
     /**
      * @brief Set the cartesian pose of the robot.
@@ -340,6 +340,7 @@ namespace iiwa_ros
       double mass;
       Eigen::Vector3d distance;
       bool initializated;
+      Payload() : mass(0), distance(Eigen::Vector3d::Zero()), initializated(false) {}
     } payload;
 
     double dt_;
