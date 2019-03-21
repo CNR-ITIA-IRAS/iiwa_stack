@@ -27,6 +27,7 @@
 #include <eigen3/Eigen/Core>
 #include <iiwa_msgs/ControlMode.h>
 #include <iiwa_ros/iiwa_ros.h>
+#include <eigen_conversions/eigen_msg.h>
 
 using namespace std;
 
@@ -118,15 +119,54 @@ bool iiwaRos::getJointStiffness ( iiwa_msgs::JointStiffness& value )
     return holder_state_joint_stiffness_.get ( value );
 }
 
-bool iiwaRos::getCartesianWrench (geometry_msgs::WrenchStamped& value , const char what)
+bool iiwaRos::getCartesianWrench (geometry_msgs::WrenchStamped& value , const char what, const bool compensate_payload)
 {
-
+  bool ret = true;
+  
   if( !isFRIModalityActive() )
-    return holder_state_wrench_.get ( value );
+    ret = holder_state_wrench_.get ( value );
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianWrench (value, what);
+    ret =  servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianWrench (value, what);
   }
+  
+  if(!ret)
+    return false;
+  
+  if (compensate_payload && payload.initializated)
+  {
+    geometry_msgs::PoseStamped pose_msg;
+    getCartesianPose(pose_msg);
+    
+    Eigen::Affine3d pose;
+    tf::poseMsgToEigen(pose_msg.pose, pose);
+    
+    Eigen::Matrix<double,6,1> wrench;
+    tf::wrenchMsgToEigen(value.wrench,wrench);
+    
+    Eigen::Vector3d gravity_b; gravity_b << 0,0,-9.81;
+    Eigen::Vector3d gravity_e = pose.linear().transpose() * gravity_b;
+    
+    Eigen::VectorXd wrench_ret(6);
+    
+    if(what == 'b')
+    {
+      wrench_ret.block(0,0,3,1) = wrench.block(0,0,3,1) + payload.mass * gravity_b;
+      wrench_ret.block(3,0,3,1) = wrench.block(3,0,3,1) + pose.linear() * (payload.mass * payload.distance.cross(gravity_e));
+    }
+    else
+    {
+      wrench_ret.block(0,0,3,1) = wrench.block(0,0,3,1) + payload.mass * gravity_e;
+      wrench_ret.block(3,0,3,1) = wrench.block(3,0,3,1) + payload.mass * payload.distance.cross(gravity_e);
+    }
+    
+    tf::wrenchEigenToMsg(wrench_ret,value.wrench);
+    
+    return true;
+  }
+  
+  
+  return ret;
 }
 
 bool iiwaRos::getJacobian(Eigen::MatrixXd& value)
@@ -292,6 +332,75 @@ void iiwaRos::setJointVelocity ( const iiwa_msgs::JointVelocity& velocity )
 #endif
 
 }
+
+bool iiwaRos::estimatePayload(const double estimation_time, const double toll)
+{
+  ros::Time st = ros::Time::now();
+  
+  geometry_msgs::WrenchStamped wrench_msg;
+  geometry_msgs::PoseStamped   pose_msg;
+  Eigen::VectorXd              wrench(6); wrench.setZero();
+  Eigen::Affine3d              pose;
+  Eigen::Vector3d              torque; torque.setZero();
+  
+  
+  if(!getCartesianPose(pose_msg))
+  {
+    ROS_ERROR("Problem in getCartesianPose");
+    return false;
+  }
+  
+  tf::poseMsgToEigen(pose_msg.pose,pose);
+  
+  int count = 0;
+  ros::Rate r(50);
+  
+  while((ros::Time::now() - st).toSec() < estimation_time)
+  {
+    count ++;
+    if(!getCartesianWrench(wrench_msg,'e'))
+    {
+      ROS_ERROR("Problem in getCartesianWrench");
+      return false;
+    }
+    
+     Eigen::Matrix<double,6,1> wrench_tmp;
+    tf::wrenchMsgToEigen(wrench_msg.wrench,wrench_tmp);
+    
+    wrench += wrench_tmp;
+    r.sleep();
+  }
+  
+  wrench /= (double)count;
+  payload.mass = wrench.block(0,0,3,1).norm()/9.81;
+  
+  Eigen::Vector3d gravity_b; gravity_b <<0, 0, -9.81;
+  Eigen::Vector3d gravity_e = pose.linear().transpose() * gravity_b;
+  
+  torque = wrench.block(3,0,3,1);
+  
+  //Tx_e = m(-gz*dy + gy*dz)   --> dz = ( Tx_e/m + gz*dy)/gy
+  //Ty_e = m(gz*dx - gx*dz )   --> dz = (-Ty_e/m + gz*dx)/gx 
+  //Tz_e = m(-gy*dx + gx*dy)
+  if(torque(2)/payload.mass > ( gravity_e(0)*toll + gravity_e(1)*toll))
+    ROS_WARN("Warning: torque along z direction not negligible");
+  
+  if(gravity_e(0) < 0.01 && gravity_e(1) > 0.01)
+    payload.distance <<0, 0,  (torque(0)/payload.mass)/gravity_e(1);
+  else if(gravity_e(0) > 0.01 && gravity_e(1) < 0.01)
+    payload.distance <<0, 0, -torque(1)/payload.mass/gravity_e(0);
+  else if(gravity_e(0) < 0.01 && gravity_e(1) < 0.01)
+  {
+    ROS_ERROR("Impossible to compute the distance. return");
+    return false;
+  }
+  else 
+    payload.distance <<0, 0, 0.5 * ( (torque(0)/payload.mass)/gravity_e(1) + -torque(1)/payload.mass/gravity_e(0) );
+  
+  payload.initializated = true;
+  return true;
+}
+  
 void iiwaRos::setJointPositionVelocity ( const iiwa_msgs::JointPositionVelocity& value )
 {
 #if defined( ENABLE_FRI )
@@ -312,6 +421,8 @@ void iiwaRos::setJointPositionVelocity ( const iiwa_msgs::JointPositionVelocity&
     holder_command_joint_position_velocity_.publishIfNew();
 #endif
 }
+
+/*
 
 
 
@@ -481,12 +592,12 @@ void iiwaRos::setJointPositionVelocity ( const iiwa_msgs::JointPositionVelocity&
       return CHECK_CLOCK( q_msg_.header.stamp, "GetJoitPosition" );
     }
 
-    bool iiwaState::GetCartesianPose( Eigen::Affine3d& cp)
+    bool iiwaState::getCartesianPose( Eigen::Affine3d& cp)
     {
 
       cp = pose_;
 
-      return CHECK_CLOCK( q_msg_.header.stamp, "GetCartesianPose" );
+      return CHECK_CLOCK( q_msg_.header.stamp, "getCartesianPose" );
     }
 
     bool iiwaState::getCartesianPoseVector(Eigen::VectorXd& x_msr)
@@ -519,7 +630,7 @@ void iiwaRos::setJointPositionVelocity ( const iiwa_msgs::JointPositionVelocity&
     bool iiwaState::getCartesianPoint( Eigen::Vector3d& point )
     {
       Eigen::Affine3d cp;
-      if(!GetCartesianPose( cp ) ) return false;
+      if(!getCartesianPose( cp ) ) return false;
       point(0) = cp.translation().x();
       point(1) = cp.translation().y();
       point(2) = cp.translation().z();
@@ -656,4 +767,5 @@ void iiwaRos::setJointPositionVelocity ( const iiwa_msgs::JointPositionVelocity&
 
     bool iiwaState::isRunning() const { return running_; }
 
+    */
 }

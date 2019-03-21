@@ -177,6 +177,9 @@ namespace iiwa_ros
      * @return void
      */
     void init(double fri_cycle_time, const bool verbosity = false );
+    
+    bool estimatePayload(const double estimation_time = 5, const double toll = 0.005);
+    
     double getFRICycleTime() const { return dt_;}
     
     /**
@@ -217,7 +220,7 @@ namespace iiwa_ros
      * @param value the current cartesian wrench of the robot.
      * @return bool
      */
-    bool getCartesianWrench(geometry_msgs::WrenchStamped& value, const char what = 'e' );
+    bool getCartesianWrench(geometry_msgs::WrenchStamped& value, const char what = 'e', const bool compensate_payload = true );
     
     /**
      * @brief Returns true is a new Joint velocity of the robot is available.
@@ -266,6 +269,7 @@ namespace iiwa_ros
      */
     TimeToDestinationService getTimeToDestinationService() { return time_to_destination_service_; };
     
+    bool payloadInitialized(){return payload.initializated; };
     
     /**
      * @brief Set the cartesian pose of the robot.
@@ -331,6 +335,12 @@ namespace iiwa_ros
     ServoMotion servo_motion_service_;
     PathParametersService path_parameters_service_;
     TimeToDestinationService time_to_destination_service_;
+    struct Payload
+    {
+      double mass;
+      Eigen::Vector3d distance;
+      bool initializated;
+    } payload;
 
     double dt_;
 
@@ -348,7 +358,7 @@ bool CHECK_CLOCK(const ros::Time& what, const std::string& msg)
   return true;
 }
 
-
+/*
 class iiwaState
 {
     bool            running_;
@@ -407,7 +417,7 @@ class iiwaState
 
     bool getJointPosition(iiwa_msgs::JointPosition& jp);
     bool getJointPosition(Eigen::VectorXd& q);
-    bool GetCartesianPose( Eigen::Affine3d& cp);
+    bool getCartesianPose( Eigen::Affine3d& cp);
     bool getCartesianPoseVector(Eigen::VectorXd& x_msr);
     bool getRotation( Eigen::Matrix3d& R  );
     bool getQuaternion( Eigen::Quaterniond& quat );
@@ -423,7 +433,7 @@ class iiwaState
     bool toJointVelocity(const Eigen::VectorXd& q, const Eigen::Vector3d& velocity, const Eigen::Vector3d& omega, Eigen::VectorXd& ret);
     bool isRunning() const;
 
-  };
+  };*/
 
 
 }
