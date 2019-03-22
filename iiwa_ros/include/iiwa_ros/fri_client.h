@@ -3,10 +3,13 @@
 #ifdef ENABLE_FRI
 
 #include <thread>
+#include <string>
+#include <mutex>
+
+#include <ros/ros.h>
 #include <realtime_tools/realtime_publisher.h>
 #include <sensor_msgs/JointState.h>
 
-#include <ros/ros.h>
 #include <iiwa_msgs/JointQuantity.h>
 #include <iiwa_msgs/JointPosition.h>
 #include <iiwa_msgs/JointVelocity.h>
@@ -16,29 +19,23 @@
 #include <iiwa_fri/friUdpConnection.h>
 #include <iiwa_fri/friClientApplication.h>
 #include <iiwa_fri/friLBRClient.h>
-#include <realtime_utilities/circular_buffer.h>
+
 
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/TwistStamped.h>
 #include <geometry_msgs/WrenchStamped.h>
 
 #include <kdl_parser/kdl_parser.hpp>
 #include <kdl/chain.hpp>
-#include <kdl/jntarray.hpp>
-#include <kdl/jacobian.hpp>
-#include <kdl/frames.hpp>
 #include <kdl/chainfksolver.hpp>
 #include <kdl/chainfksolverpos_recursive.hpp>
 #include <kdl/chainjnttojacsolver.hpp>
-#include <kdl/frames_io.hpp>
 #include <eigen_conversions/eigen_kdl.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <eigen3/Eigen/QR>
-#include <stdio.h>
-
 #include <eigen3/Eigen/Core>
-#include <string>
-#include <mutex>
 
+#include <realtime_utilities/circular_buffer.h>
 #include <eigen_state_space_systems/eigen_common_filters.h>
 
 
@@ -100,35 +97,37 @@ struct Filter
   Eigen::VectorXd values_;
   Eigen::VectorXd dead_band_;
   Eigen::VectorXd saturation_; 
-  double filt_time_;
+  double natural_frequency_;
   double sampling_time_;
   std::vector < eigen_control_toolbox::FirstOrderLowPass *> lpf;
 
   Filter( ) : initialized_(false ){ }
 
-  void init( const Eigen::VectorXd& dead_band, const Eigen::VectorXd& saturation, const double filt_time, const double sampling_time, const Eigen::VectorXd& init_value )
+  void init( const Eigen::VectorXd& dead_band
+           , const Eigen::VectorXd& saturation
+           , const double natural_frequency
+           , const double sampling_time
+           , const Eigen::VectorXd& init_value )
   {
     values_ = init_value;
     dead_band_ = dead_band;
     saturation_ = saturation;
-    filt_time_ = filt_time;
+    natural_frequency_ = natural_frequency;
     sampling_time_ = sampling_time;
     initialized_ = true;
-    
-    double natural_frequency = (1/filt_time_) * 2 * M_PI ; // [rad/s]
     
     for(int i = 0; i < init_value.rows(); i++)
     {
       Eigen::VectorXd u(1); u.setZero();
-      lpf.push_back(new eigen_control_toolbox::FirstOrderLowPass( natural_frequency,sampling_time_));
+      lpf.push_back(new eigen_control_toolbox::FirstOrderLowPass( natural_frequency_,sampling_time_));
       lpf.back()->setStateFromIO(u,u);
     }
   
-   ROS_WARN_STREAM("Init Values: " << values_.transpose() );
-   ROS_WARN_STREAM("dead_band_: " << dead_band_.transpose() );
-   ROS_WARN_STREAM("saturation: " << saturation_.transpose() );
-   ROS_WARN_STREAM("filt_time_ : " << filt_time_ );
-   ROS_WARN_STREAM("initialized: " << initialized_ );
+   ROS_WARN_STREAM("Init Values......: " << values_.transpose() );
+   ROS_WARN_STREAM("dead_band........: " << dead_band_.transpose() );
+   ROS_WARN_STREAM("saturation.......: " << saturation_.transpose() );
+   ROS_WARN_STREAM("natural_frequency: " << natural_frequency_ );
+   ROS_WARN_STREAM("initialized......: " << initialized_ );
     
   }
 
@@ -161,6 +160,25 @@ struct Filter
 
 namespace iiwa_ros 
 {
+
+static const std::string FRI_CYCLE_TIME_S_NS = "fri/cycle_time_s";
+
+static const std::string WRENCH_FILTER_SATURATION_NS = "fri/filter/wrench/saturation";
+static const std::string WRENCH_FILTER_DEADBAND_NS   = "fri/filter/wrench/deadband";
+static const std::string WRENCH_FILTER_FREQUENCY_NS  = "fri/filter/wrench/cutoff_frequency_hz";
+
+static const std::string TWIST_FILTER_SATURATION_NS  = "fri/filter/twist/saturation";
+static const std::string TWIST_FILTER_DEADBAND_NS    = "fri/filter/twist/deadband";
+static const std::string TWIST_FILTER_FREQUENCY_NS   = "fri/filter/twist/cutoff_frequency_hz";
+
+static const std::string FRI_PORT_NS                 = "fri/port";
+static const std::string FRI_HOSTNAME_NS             = "fri/hostname";
+static const std::string FRI_TIMEOUT_MS_NS           = "fri/timeout_ms";
+static const std::string ROBOT_DESCRIPTION_NS        = "fri/robot_description_param";
+static const std::string ROBOT_LINK_BASE_NS          = "fri/base_link";
+static const std::string ROBOT_TOOL_BASE_NS          = "fri/tool_link";
+
+
 class LBRJointOverlayClient : public KUKA::FRI::LBRClient
 {
 private:
@@ -171,14 +189,7 @@ private:
 
   public:
   
-    LBRJointOverlayClient ( const std::string& robot_description
-                          , const std::string& chain_root
-                          , const std::string& chain_tip
-                          , const double wrench_filter_frequency
-                          , const Eigen::Vector6d& wrench_filter_deadband
-                          , const double twist_filter_frequency
-                          , const Eigen::Vector6d& twsit_filter_deadband
-                          , const size_t target_queue_lenght = 1e2 );
+    LBRJointOverlayClient ( const size_t target_queue_lenght = 1e2 );
     ~LBRJointOverlayClient( );
     
     virtual void onStateChange(KUKA::FRI::ESessionState oldState, KUKA::FRI::ESessionState newState);
@@ -195,28 +206,32 @@ private:
     virtual void newWrenchCommand( const std::vector< double >& new_wrench_command ) ;
     virtual void newWrenchCommand( const iiwa_msgs::CartesianQuantity& wrench ) ;
 
-    virtual bool getJointPosition ( iiwa_msgs::JointPosition& value );
-    virtual bool getJointPosition ( std::vector< double >& joint_pos );
+    virtual bool getJointPosition ( iiwa_msgs::JointPosition& value ) const;
+    virtual bool getJointPosition ( Eigen::VectorXd& joint_pos ) const;
 
-    virtual bool getJointTorque ( iiwa_msgs::JointTorque& value );
-    virtual bool getJointTorque ( std::vector< double >& joint_tau );
+    virtual bool getJointTorque ( iiwa_msgs::JointTorque& value ) const;
+    virtual bool getJointTorque ( Eigen::VectorXd& joint_tau ) const;
 
-    virtual bool getJointVelocity ( iiwa_msgs::JointVelocity& value );
-    virtual bool getJointVelocity ( std::vector< double >& joint_vel );
+    virtual bool getJointVelocity ( iiwa_msgs::JointVelocity& value ) const;
+    virtual bool getJointVelocity ( Eigen::VectorXd& joint_vel ) const;
 
-    virtual bool getCartesianPose ( geometry_msgs::PoseStamped& value );
-    virtual bool getCartesianPose ( Eigen::Affine3d& pose );
+    virtual bool getCartesianPose ( geometry_msgs::PoseStamped& value ) const;
+    virtual bool getCartesianPose ( Eigen::Affine3d& pose ) const;
 
-    virtual bool getCartesianWrench( geometry_msgs::WrenchStamped& value, const char frame = 'e'  );
-    virtual bool getCartesianWrench( Eigen::VectorXd& wrench, const char frame = 'e' );
+    virtual bool getCartesianWrench( geometry_msgs::WrenchStamped& value, const char frame, const bool filtered = true  );
+    virtual bool getCartesianWrench(Eigen::VectorXd& wrench, const char frame, const bool filtered = true ) const;
 
-    virtual bool getJacobian(Eigen::MatrixXd& value);
+    virtual bool getCartesianTwist( Eigen::Vector6d& twist, const char frame, const bool filtered = true ) const;
+    virtual bool getCartesianTwist( geometry_msgs::TwistStamped& value, const char frame, const bool filtered = true ) const;
 
-    virtual void getCartesianVelocity( Eigen::Affine3d& pose );
+    virtual bool getJacobian(Eigen::MatrixXd& value) const;
 
     virtual bool isControlRunning( ) const;
-        
+
+    virtual bool updatetFirstOrderKinematic( );
+
   private:
+
     realtime_utilities::circ_buffer< std::vector<double> > command_joint_position_;
     realtime_utilities::circ_buffer< std::vector<double> > command_joint_torque_;
     realtime_utilities::circ_buffer< std::vector<double> > command_wrench_;
@@ -237,8 +252,23 @@ private:
     std::shared_ptr< KDL::ChainFkSolverPos_recursive > fksolver_;
     std::shared_ptr< KDL::ChainJntToJacSolver        > jacsolver_;
     
-    Filter  wrench_filter_;
-    Filter  twist_filter_;
+    Eigen::Vector6d raw_wrench_b_;
+    Eigen::Vector6d filtered_wrench_b_;
+    Filter  wrench_b_filter_;
+
+    Eigen::Vector6d   raw_twist_b_;
+    Eigen::Vector6d   filtered_twist_b_;
+    Filter            twist_b_filter_;
+
+    Eigen::Affine3d   cartesian_pose_;
+    Eigen::VectorXd   joint_torque_;
+    Eigen::VectorXd   joint_position_;
+    Eigen::VectorXd   joint_position_prev_;
+    Eigen::VectorXd   joint_velocity_;
+    Eigen::MatrixXd   jacobian_;
+
+    double fri_cycle_time_s_;
+    ros::Time update_time_;
 
 };
 
@@ -247,7 +277,7 @@ class LBROverlayApp
 public:
   
   
-  LBROverlayApp( const int& port, const std::string& hostname, int connection_timeout_ms, const std::string& robot_description, const std::string& chain_root, const std::string& chain_tip  );
+  LBROverlayApp( );
     
   ~LBROverlayApp( );
 
@@ -264,12 +294,12 @@ private:
   bool                                            active_;
   bool                                            stop_fri_command_thread_;
   std::shared_ptr<boost::thread>                  command_thread_; 
-  int                                             port_;
-  std::string                                     hostname_;
-  KUKA::FRI::UdpConnection                        connection_;
+  int                                             fri_port_;
+  std::string                                     fri_hostname_;
+  int                                             fri_timeout_ms_;
+  std::shared_ptr<KUKA::FRI::UdpConnection>       connection_;
   LBRJointOverlayClient                           client_;
   std::shared_ptr< KUKA::FRI::ClientApplication > app_;
-
 
 };
 

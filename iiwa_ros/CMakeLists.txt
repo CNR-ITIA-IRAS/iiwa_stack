@@ -17,11 +17,12 @@ find_package(catkin REQUIRED COMPONENTS
   iiwa_msgs
   roscpp
   realtime_utilities
+  rosparam_utilities
   realtime_tools
-  kdl_parser
   eigen_conversions
   kdl_conversions
   eigen_state_space_systems
+  kdl_parser
 )
 
 find_package(Boost REQUIRED system filesystem date_time thread )

@@ -18,7 +18,22 @@
   <build_depend>realtime_utilities</build_depend>
   <run_depend>realtime_utilities</run_depend>
 
+  <build_depend>rosparam_utilities</build_depend>
+  <run_depend>rosparam_utilities</run_depend>
+
   <build_depend>eigen_conversions</build_depend>
   <run_depend>eigen_conversions</run_depend>
+
+  <build_depend>orocos_kdl</build_depend>
+  <build_depend>kdl_parser</build_depend>
+
+  <run_depend>orocos_kdl</run_depend>
+  <run_depend>kdl_parser</run_depend>
+
+
+  <run_depend>eigen_state_space_systems</run_depend>
+  <run_depend>eigen_state_space_systems</run_depend>
+
+
 
 </package>

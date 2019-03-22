@@ -41,10 +41,6 @@ ros::Time last_update_time;
 iiwaRos::iiwaRos() { }
 
 void iiwaRos::init (double fri_cycle_time
-                    , const double wrench_filter_frequency
-                    , const Eigen::Vector6d& wrench_filter_deadband
-                    , const double twist_filter_frequency
-                    , const Eigen::Vector6d& twist_filter_deadband
                     , const bool verbosity)
 {
     dt_ = fri_cycle_time;
@@ -71,13 +67,113 @@ void iiwaRos::init (double fri_cycle_time
     servo_motion_service_.setVerbosity(verbosity);
     path_parameters_service_.setVerbosity(verbosity);
     time_to_destination_service_.setVerbosity(verbosity);
-    
-    wrench_filter_saturation_ << 200, 200, 200, 200, 200, 200;
-    wrench_filter_deadband_ = wrench_filter_deadband; 
-    wrench_filter_saturation_ =  1./wrench_filter_frequency_;
-    
-    Eigen::Vector6d twist_filter_saturation;  twist_filter_saturation << 2,2,2,2,2,2;
-    twist_filter_. init( twist_filter_deadband, twist_filter_saturation, 1./twist_filter_frequency, fri_cycle_time, Eigen::Vector6d::Zero()  );
+
+    stop_fri_publisher_thread_ = false;
+
+}
+
+
+
+void iiwaRos::friPublisherThread()
+#define CATCH_ERROR(X) if(!X){ROS_ERROR_THROTTLE(10,"%s failed", #X);}
+
+{
+  ros::NodeHandle nh("~");
+
+  ros::Publisher state_joint_position_pub  = nh.advertise<iiwa_msgs::JointPosition>      ( "/iiwa/state/JointPosition"                             , 10  );
+  ros::Publisher state_joint_torque_pub    = nh.advertise<iiwa_msgs::JointTorque>        ( "/iiwa/state/JointTorque"                               , 10  );
+  ros::Publisher state_joint_velocity_pub  = nh.advertise<iiwa_msgs::JointVelocity>      ( "/iiwa/state/JointVelocity"                             , 10  );
+
+  ros::Publisher state_pose_pub            = nh.advertise<geometry_msgs::PoseStamped>    ( "/iiwa/state/CartesianPose"                             , 10  );
+
+  ros::Publisher state_fwrench_b_pub       = nh.advertise<geometry_msgs::WrenchStamped>  ( "/iiwa/state/base/filtered/CartesianWrench"             , 10 );
+  ros::Publisher state_rwrench_b_pub       = nh.advertise<geometry_msgs::WrenchStamped>  ( "/iiwa/state/base/raw/CartesianWrench"                  , 10 );
+  ros::Publisher state_cwrench_b_pub       = nh.advertise<geometry_msgs::WrenchStamped>  ( "/iiwa/state/base/payload_compensated/CartesianWrench"  , 10 );
+
+  ros::Publisher state_fwrench_t_pub       = nh.advertise<geometry_msgs::WrenchStamped>  ( "/iiwa/state/tool/filtered/CartesianWrench"             , 10 );
+  ros::Publisher state_rwrench_t_pub       = nh.advertise<geometry_msgs::WrenchStamped>  ( "/iiwa/state/tool/raw/CartesianWrench"                  , 10 );
+  ros::Publisher state_cwrench_t_pub       = nh.advertise<geometry_msgs::WrenchStamped>  ( "/iiwa/state/tool/payload_compensated/CartesianWrench"  , 10 );
+
+  ros::Publisher state_ftwist_b_pub        = nh.advertise<geometry_msgs::TwistStamped>   ( "/iiwa/state/base/filtered/CartesianTwist"              , 10 );
+  ros::Publisher state_rtwist_b_pub        = nh.advertise<geometry_msgs::TwistStamped>   ( "/iiwa/state/base/raw/CartesianTwist"                   , 10 );
+
+  ros::Publisher state_ftwist_t_pub        = nh.advertise<geometry_msgs::TwistStamped>   ( "/iiwa/state/tool/filtered/CartesianTwist"              , 10 );
+  ros::Publisher state_rtwist_t_pub        = nh.advertise<geometry_msgs::TwistStamped>   ( "/iiwa/state/tool/raw/CartesianTwist"                   , 10 );
+
+
+  double default_publisher_freq = 50.;
+  double publisher_freq = 100.;
+  if(!nh.getParam(FRI_STATE_PUBISHER_FREQ_HS_NS, publisher_freq) )
+  {
+    ROS_WARN("The iiwa state update publisher frequency is not set. The default value equal to %fHz is superimposed", publisher_freq);
+    publisher_freq = default_publisher_freq;
+  }
+
+  ros::Rate rt( publisher_freq );
+  while( ros::ok && ! stop_fri_publisher_thread_ )
+  {
+
+
+    iiwa_msgs::JointPosition      jp        ; CATCH_ERROR( getJointPosition      (jp       )                        );
+    iiwa_msgs::JointTorque        jt        ; CATCH_ERROR( getJointTorque        (jt       )                        );
+    iiwa_msgs::JointVelocity      jv        ; CATCH_ERROR( getJointVelocity      (jv       )                        );
+
+    geometry_msgs::PoseStamped    pose      ; CATCH_ERROR( getCartesianPose      (pose     )                        );
+
+    geometry_msgs::WrenchStamped  fwrench_b ; CATCH_ERROR( getCartesianWrench    (fwrench_b , 'b', true , false)    );
+    geometry_msgs::WrenchStamped  rwrench_b ; CATCH_ERROR( getCartesianWrench    (rwrench_b , 'b', false, false)    );
+    geometry_msgs::WrenchStamped  cwrench_b ; CATCH_ERROR( getCartesianWrench    (cwrench_b , 'b', true , true )    );
+
+    geometry_msgs::WrenchStamped  fwrench_t ; CATCH_ERROR( getCartesianWrench    (fwrench_t , 't', true , false)    );
+    geometry_msgs::WrenchStamped  rwrench_t ; CATCH_ERROR( getCartesianWrench    (rwrench_t , 't', false, false)    );
+    geometry_msgs::WrenchStamped  cwrench_t ; CATCH_ERROR( getCartesianWrench    (cwrench_t , 't', true , true )    );
+
+    geometry_msgs::TwistStamped   ftwist_b  ; CATCH_ERROR( getCartesianTwist     (ftwist_b  , 'b', true )           );
+    geometry_msgs::TwistStamped   rtwist_b  ; CATCH_ERROR( getCartesianTwist     (rtwist_b  , 'b', false)           );
+
+    geometry_msgs::TwistStamped   ftwist_t  ; CATCH_ERROR( getCartesianTwist     (ftwist_t  , 't', true )           );
+    geometry_msgs::TwistStamped   rtwist_t  ; CATCH_ERROR( getCartesianTwist     (rtwist_t  , 't', false)           );
+
+    state_joint_position_pub.publish( jp        );
+    state_joint_torque_pub  .publish( jt        );
+    state_joint_velocity_pub.publish( jv        );
+
+    state_pose_pub          .publish( pose      );
+
+    state_fwrench_b_pub     .publish( fwrench_b );
+    state_rwrench_b_pub     .publish( rwrench_b );
+    state_cwrench_b_pub     .publish( cwrench_b );
+
+    state_fwrench_t_pub     .publish( fwrench_t );
+    state_rwrench_t_pub     .publish( rwrench_t );
+    state_cwrench_t_pub     .publish( cwrench_t );
+
+    state_ftwist_b_pub      .publish( ftwist_b  );
+    state_rtwist_b_pub      .publish( rtwist_b  );
+
+    state_ftwist_t_pub      .publish( ftwist_t  );
+    state_rtwist_t_pub      .publish( rtwist_t  );
+
+    rt.sleep();
+  }
+
+}
+
+void iiwaRos::startFriPublisher()
+{
+  stop_fri_publisher_thread_ = false;
+  while( !isFRIModalityActive() && ros::ok() )
+  {
+      ROS_WARN_THROTTLE( 2, "The FRI is not yet started... " );
+  }
+  fri_publisher_thread_.reset( new std::thread( &iiwaRos::friPublisherThread, this ) );
+}
+
+void iiwaRos::stopFriPublisher()
+{
+  stop_fri_publisher_thread_ = true;
+  fri_publisher_thread_->join();
+  fri_publisher_thread_.reset(  );
 }
 
 bool iiwaRos::getRobotIsConnected()
@@ -136,35 +232,29 @@ bool iiwaRos::getCartesianWrench (geometry_msgs::WrenchStamped& value, const cha
 {
   bool ret = true;
   
-  geometry_msgs::WrenchStamped raw_value_b;
-  Eigen::VectorXd              raw_wrench_b = Eigen::VectorXd(6).setZero();
-  Eigen::VectorXd              filtered_wrench_b = Eigen::VectorXd(6).setZero();
+  Eigen::VectorXd              wrench = Eigen::VectorXd(6).setZero();
   if( !isFRIModalityActive() )
   {
-    ret = holder_state_wrench_.get ( raw_value_b );
+    ret = holder_state_wrench_.get ( value );
   }
   else
   {
-    ret =  servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianWrench (raw_value_b, 'b');
+    ret = servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianWrench (value, what, filtered);
   }
   
   if(!ret)
     return false;
   
-  raw_wrench_b(0) = raw_value_b.wrench.force.x;
-  raw_wrench_b(1) = raw_value_b.wrench.force.y;
-  raw_wrench_b(2) = raw_value_b.wrench.force.z;
-  raw_wrench_b(3) = raw_value_b.wrench.torque.x;
-  raw_wrench_b(4) = raw_value_b.wrench.torque.y;
-  raw_wrench_b(5) = raw_value_b.wrench.torque.z;
-  
-  
-  filtered_wrench_b = wrench_filter_.update( raw_wrench_b );
+  wrench(0) = value.wrench.force.x;
+  wrench(1) = value.wrench.force.y;
+  wrench(2) = value.wrench.force.z;
+  wrench(3) = value.wrench.torque.x;
+  wrench(4) = value.wrench.torque.y;
+  wrench(5) = value.wrench.torque.z;
   
   Eigen::VectorXd wrench_ret(6); wrench_ret.setZero();
   if (compensate_payload && payload.initializated)
   {
-    Eigen::VectorXd wrench_b =  filtered ? filtered_wrench_b : raw_wrench_b;
     
     geometry_msgs::PoseStamped pose_msg;
     while(! getCartesianPose(pose_msg) )
@@ -183,66 +273,51 @@ bool iiwaRos::getCartesianWrench (geometry_msgs::WrenchStamped& value, const cha
       Eigen::Vector3d gravity_e = pose.linear().transpose() * gravity_b;
       
       if(what == 'b')
-      {
-        wrench_ret.block(0,0,3,1) = wrench_b.block(0,0,3,1) - payload.mass * gravity_b;
-        wrench_ret.block(3,0,3,1) = wrench_b.block(3,0,3,1) - pose.linear() * (payload.mass * payload.distance.cross(gravity_e));
+      { // "wrench" is in base frame
+        wrench_ret.block(0,0,3,1) = wrench.block(0,0,3,1) - payload.mass * gravity_b;
+        wrench_ret.block(3,0,3,1) = wrench.block(3,0,3,1) - pose.linear() * (payload.mass * payload.distance.cross(gravity_e));
       }
       else
-      {
-        wrench_ret.block(0,0,3,1) = pose.linear().transpose() * wrench_b.block(0,0,3,1) - payload.mass * gravity_e;
-        wrench_ret.block(3,0,3,1) = pose.linear().transpose() * wrench_b.block(3,0,3,1) - payload.mass * payload.distance.cross(gravity_e);
+      { // "wrench" is in tool frame
+        wrench_ret.block(0,0,3,1) = wrench.block(0,0,3,1) - payload.mass * gravity_e;
+        wrench_ret.block(3,0,3,1) = wrench.block(3,0,3,1) - payload.mass * payload.distance.cross(gravity_e);
       }
     }
     else
     {
       if(what == 'b')
       {
-        wrench_ret = wrench_b - payload.wrench_offset_b;
+        wrench_ret = wrench - payload.wrench_offset_b;
       }
       else
-      {
-        wrench_ret.block(0,0,3,1) = pose.linear().transpose() * ( wrench_b.block(0,0,3,1) - payload.wrench_offset_b.block(0,0,3,1) );
-        wrench_ret.block(3,0,3,1) = pose.linear().transpose() * ( wrench_b.block(3,0,3,1) - payload.wrench_offset_b.block(3,0,3,1) );
+      { // "wrench" is in tool frame
+        wrench_ret.block(0,0,3,1) = pose.linear().transpose( ) * (pose.linear() * wrench.block(0,0,3,1) - payload.wrench_offset_b.block(0,0,3,1) );
+        wrench_ret.block(3,0,3,1) = pose.linear().transpose( ) * (pose.linear() * wrench.block(3,0,3,1) - payload.wrench_offset_b.block(3,0,3,1) );
       }
     }
-    
   }
   else
   {
-      wrench_ret = filtered ? filtered_wrench_b : raw_wrench_b;
+      wrench_ret = wrench;
   }
-  std::cout << wrench_ret.transpose() << std::endl;
-  
+
   value.header.stamp = ros::Time::now();
   tf::wrenchEigenToMsg(wrench_ret,value.wrench);
   return true;
 }
 
 
-bool iiwaRos::getCartesianTwist( geometry_msgs::TwistStamped value, const char what, const bool filtered  )
+bool iiwaRos::getCartesianTwist( geometry_msgs::TwistStamped& value, const char what, const bool filtered  )
 {
-  Eigen::MatrixXd j;
-  Eigen::VectorXd dq;
-  iiwa_msgs::JointVelocity jv;  
-  
-  getJacobian     ( j  );
-  getJointVelocity( jv ); iiwaJointVelocityToEigenVector( jv, dq );
-  
-  Eigen::VectorXd raw_twist = j * dq;
-  Eigen::VectorXd filtered_twist = wrench_filter_.update( raw_twist );
-  
-  Eigen::VectorXd twist = filtered ? filtered_twist : raw_twist;
-  if( what !='b' )
+  if( !isFRIModalityActive() )
   {
-    Eigen::Affine3d pose;
-    geometry_msgs::PoseStamped cp;
-    getCartesianPose( cp );
-    tf::poseMsgToEigen( cp.pose, pose );
-    twist.block(0,0,3,1) = pose.linear().transpose() * twist.block(0,0,3,1);
-    twist.block(3,0,3,1) = pose.linear().transpose() * twist.block(3,0,3,1);
+    ROS_ERROR_THROTTLE(5,"Not yet supported");
+    return false;
   }
-  value.header.stamp = ros::Time::now();
-  tf::twistEigenToMsg(twist, value.twist);
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianTwist(value, what, filtered);
+  }
   return true;
 }
 
@@ -312,15 +387,15 @@ void iiwaRos::setPayload ( const geometry_msgs::PoseStamped& position )
   || ( control_modality_active == 8 ) 
   )
   {
-    std::cout << "setting the new payload..." << std::endl;
-    std::cout << position.pose << std::endl;
+    ROS_INFO( "setting the new payload..." );
+    ROS_INFO_STREAM( " position.pose ");
     holder_command_payload_.set ( position );
     holder_command_payload_.publishIfNew();
     ros::Duration(3.).sleep();
   }
   else
   {
-    std::cout << "setting the new payload..." << std::endl;
+    ROS_INFO( "setting the new payload..." );
     holder_command_payload_.set ( position );
     holder_command_payload_.publishIfNew();
     ros::Duration(3.).sleep();
@@ -524,11 +599,11 @@ bool iiwaRos::setWrenchOffset(const double estimation_time)
   ROS_INFO_STREAM("Estimation finished: "  << payload.wrench_offset_b.transpose() );
   geometry_msgs::WrenchStamped value;
   getCartesianWrench (value, 'b', true, true );
-  std::cout << value.wrench <<std::endl;
+  ROS_INFO_STREAM( " Wrench in Base, filtered and compensated: " << value.wrench );
   getCartesianWrench (value, 'b', false, true );
-  std::cout << value.wrench <<std::endl;
+  ROS_INFO_STREAM( " Wrench in Base, raw and compensated: " << value.wrench );
   getCartesianWrench (value, 'b', false, false );
-  std::cout << value.wrench <<std::endl;
+  ROS_INFO_STREAM( " Wrench in Base, raw: " << value.wrench );
   payload.initializated = true;
   return true;
 }
@@ -555,350 +630,4 @@ void iiwaRos::setJointPositionVelocity ( const iiwa_msgs::JointPositionVelocity&
 #endif
 }
 
-/*
-
-
-
-
-    void iiwaState::iiwaStateJointPosition(const iiwa_msgs::JointPositionConstPtr& msg )
-    {
-      q_msg_ = *msg;
-
-      if( first_q_ )
-      {
-        first_q_ = false;
-        q_msg_.header.stamp = ros::Time::now();
-        iiwa_ros::iiwaJointPositionToEigenVector(q_msg_, q_);
-        dq_.setZero();
-      }
-      else
-      {
-        ros::Time last_time = q_msg_.header.stamp;
-        q_msg_.header.stamp = ros::Time::now();
-        double dt = ( q_msg_.header.stamp  -last_time ).toSec();
-        Eigen::VectorXd q_prev = q_;
-        iiwa_ros::iiwaJointPositionToEigenVector(q_msg_, q_);
-        dq_ = ( q_ - q_prev ) / dt;
-      }
-      KDL::Frame cartpos;
-      unsigned int nj = iiwa_tree_.getNrOfJoints();
-      KDL::JntArray jointpositions = KDL::JntArray(nj);
-      for(size_t i=0;i<nj;i++)
-        jointpositions(i) = q_(i);
-      bool kinematics_status = fksolver_->JntToCart(jointpositions,cartpos);
-      tf::transformKDLToEigen(cartpos, pose_);
-      KDL::Jacobian jac;
-      jac.resize(iiwa_chain_.getNrOfJoints());
-      int err = jacsolver_->JntToJac (jointpositions, jac );
-      assert( jac.columns() == 7 );
-      assert( jac.rows() == 6 );
-      for(size_t i=0; i<6; i++)
-        for(size_t j=0; j<7; j++)
-          jacobian_(i,j) = jac(i,j);
-
-      twist_    = jacobian_ * dq_;
-
-      running_ = true;
-
-    }
-    void iiwaState::iiwaStateJointVelocity(const iiwa_msgs::JointVelocityConstPtr& msg )
-    {
-      dq_msg_ = *msg;
-      dq_msg_.header.stamp = ros::Time::now();
-      iiwa_ros::iiwaJointVelocityToEigenVector(dq_msg_, dq_);
-    }
-    void iiwaState::iiwaStateJointTorque(const iiwa_msgs::JointTorqueConstPtr& msg )
-    {
-      tau_msg_ = *msg;
-      tau_msg_.header.stamp = ros::Time::now();
-      iiwa_ros::iiwaJointTorqueToEigenVector(tau_msg_, tau_);
-    }
-    void iiwaState::iiwaStateWrench(const geometry_msgs::WrenchStampedConstPtr& msg )
-    {
-
-      wrench_ = *msg;
-      wrench_.header.stamp = ros::Time::now();
-
-
-      Eigen::Matrix<double,6,1> e;
-      tf::wrenchMsgToEigen(msg->wrench, e);
-      if( first_run_ )
-      {
-
-        f_ee_ << e(0),e(1),e(2);
-        f0_   << e(0),e(1),e(2);
-        tau_ee_ << e(3),e(4),e(5);
-        tau0_   << e(3),e(4),e(5);
-
-        first_run_ = false;
-        std::cout<<"f0: "<< f_ee_.transpose()<<std::endl;
-      }
-
-      f_ee_ << e(0),e(1),e(2);
-      f_ee_ -= f0_;
-      f_b_   = pose_.linear() * f_ee_;
-
-      tau_ee_ << e(3),e(4),e(5);
-      tau_ee_ -= tau0_;
-      tau_b_   = pose_.linear() * tau_ee_;
-
-    }
-
-
-    iiwaState::iiwaState ( const std::string& robot_description
-              , const std::string &chain_root
-              , const std::string &chain_tip
-              , const Eigen::VectorXd& m, const Eigen::VectorXd& c, const Eigen::VectorXd& k )
-    : running_   ( false )
-    , q_         ( 7 )
-    , dq_        ( 7 )
-    , tau_       ( 7 )
-    , jacobian_  ( 6, 7 )
-    , first_run_ ( true )
-    , first_q_   ( true )
-    , M(6,6)
-    , C(6,6)
-    , K(6,6)
-    {
-      ros::NodeHandle nh("~");
-
-
-      std::string robot_desc_string;
-      nh.param(robot_description, robot_desc_string, std::string());
-      if (!kdl_parser::treeFromString(robot_desc_string, iiwa_tree_))
-      {
-         ROS_ERROR("Failed to construct kdl tree");
-         throw std::runtime_error("Failed to to construct kdl tree");
-      }
-
-      iiwa_tree_.getChain ( chain_root, chain_tip, iiwa_chain_);
-      fksolver_.reset( new KDL::ChainFkSolverPos_recursive( iiwa_chain_ ) );
-      jacsolver_.reset( new KDL::ChainJntToJacSolver( iiwa_chain_ ) );
-
-      M  = m.asDiagonal();
-      C  = c.asDiagonal();
-      K  = k.asDiagonal();
-
-      for(int i = 0; i<C.rows(); i++){
-        for (int j = 0; j<C.cols(); j++){
-          C(i,j) = 2*C(i,j)*sqrt(M(i,j)*K(i,j));
-        }
-      }
-
-      ROS_INFO_STREAM( "Control parameters:\n matrix M\n"<< M << "\nmatrix C\n"<< C << "\nmatrix K\n"<< K  );
-
-      q_       .setZero();
-      dq_      .setZero();
-      jacobian_.setZero();
-      f_ee_    .setZero();
-      f_b_     .setZero();
-      f0_      .setZero();
-      tau_ee_    .setZero();
-      tau_b_     .setZero();
-      tau0_      .setZero();
-
-
-      sub_joint_position = nh.subscribe("/iiwa/state/JointPosition"  , 1000, &iiwaState::iiwaStateJointPosition  , this);
-      sub_joint_velocity = nh.subscribe("/iiwa/state/JointVelocity"  , 1000, &iiwaState::iiwaStateJointVelocity  , this);
-      sub_joint_torque   = nh.subscribe("/iiwa/state/JointTorque"    , 1000, &iiwaState::iiwaStateJointTorque    , this);
-      sub_cart_wrench    = nh.subscribe("/iiwa/state/CartesianWrench", 1000, &iiwaState::iiwaStateWrench         , this);
-
-
-    }
-
-    iiwaState::~iiwaState( )
-    {
-    }
-
-
-    bool iiwaState::getJointPosition(iiwa_msgs::JointPosition& jp)
-    {
-      jp = q_msg_;
-      return CHECK_CLOCK( q_msg_.header.stamp, "GetJoitPosition" );
-    }
-
-    bool iiwaState::getJointPosition(Eigen::VectorXd& q)
-    {
-
-      q = q_;
-
-      return CHECK_CLOCK( q_msg_.header.stamp, "GetJoitPosition" );
-    }
-
-    bool iiwaState::getCartesianPose( Eigen::Affine3d& cp)
-    {
-
-      cp = pose_;
-
-      return CHECK_CLOCK( q_msg_.header.stamp, "getCartesianPose" );
-    }
-
-    bool iiwaState::getCartesianPoseVector(Eigen::VectorXd& x_msr)
-    {
-      geometry_msgs::PoseStamped pose;
-
-      tf::poseEigenToMsg(pose_, pose.pose );
-
-      x_msr = iiwa_ros::poseToVec( pose );
-      return CHECK_CLOCK( q_msg_.header.stamp, "getCartesianPoseVector" );
-    }
-
-    bool iiwaState::getRotation( Eigen::Matrix3d& R  )
-    {
-
-      R = pose_.linear();
-
-      return CHECK_CLOCK( q_msg_.header.stamp, "getRotation" );
-    }
-
-    bool iiwaState::getQuaternion( Eigen::Quaterniond& quat )
-    {
-
-      quat = Eigen::Quaterniond( pose_.linear() ).normalized();
-
-      return CHECK_CLOCK( q_msg_.header.stamp, "getQuaternion" );
-    }
-
-
-    bool iiwaState::getCartesianPoint( Eigen::Vector3d& point )
-    {
-      Eigen::Affine3d cp;
-      if(!getCartesianPose( cp ) ) return false;
-      point(0) = cp.translation().x();
-      point(1) = cp.translation().y();
-      point(2) = cp.translation().z();
-      return true;
-    }
-
-    bool iiwaState::getWrench( Eigen::VectorXd& ret, const char what)
-    {
-
-      Eigen::Vector3d f = (what == 'e' ) ? f_ee_  : f_b_;
-      Eigen::Vector3d t = (what == 'e' ) ? tau_ee_  : tau_b_;
-      ros::Time st = wrench_.header.stamp;
-
-      ret.resize(6);
-      ret << f(0),f(1),f(2),t(0),t(1),t(2);
-      return CHECK_CLOCK( st, "getWrench" );
-    }
-
-    bool iiwaState::getForce( Eigen::Vector3d& ret, const char what)
-    {
-      Eigen::VectorXd tmp;
-      if(!getWrench( tmp, what )) return false;
-      ret << tmp(0), tmp(1), tmp(2);
-      return true;
-    }
-
-    bool iiwaState::getTorque( Eigen::Vector3d& ret, const char what)
-    {
-      Eigen::VectorXd tmp;
-      if(!getWrench( tmp, what )) return false;
-      ret << tmp(3), tmp(4), tmp(5);
-      return true;
-    }
-
-    bool iiwaState::getTwist( Eigen::VectorXd&  ret )
-    {
-
-      ret = twist_;
-
-      return CHECK_CLOCK( q_msg_.header.stamp, "getTwist" );
-    }
-
-    bool iiwaState::getVelocity( Eigen::Vector3d& vel )
-    {
-      Eigen::VectorXd  vel6;
-      if(!getTwist( vel6 )) return false;
-      vel << vel6(0), vel6(1), vel6(2);
-      return true;
-    }
-
-    bool iiwaState::getOmega( Eigen::Vector3d& omega )
-    {
-      Eigen::VectorXd  vel6;
-      if(!getTwist( vel6 )) return false;
-      omega << vel6(0), vel6(1), vel6(2);
-      return true;
-    }
-
-
-    bool iiwaState::getMatrix( Eigen::Matrix3d& ret , const char what, const char translation )
-    {
-      for (int i = 0; i < 3; i++)
-      {
-        for (int j = 0; j < 3; j++){
-          ret(i,j)  = what ==  'M' ? M(i + ( translation ? 0 : 3  ) ,j + + ( translation ? 0 : 3  ) )
-                    : what ==  'K' ? K(i + ( translation ? 0 : 3  ) ,j + + ( translation ? 0 : 3  ) )
-                    : what ==  'C' ? C(i + ( translation ? 0 : 3  ) ,j + + ( translation ? 0 : 3  ) )
-                    : std::nan("");
-          assert( std::isfinite( ret(i,j) ) );
-        }
-      }
-      return true;
-    }
-
-    bool iiwaState::toJointVelocity(const Eigen::Vector3d& velocity, const Eigen::Vector3d& omega, Eigen::VectorXd& ret)
-    {
-      Eigen::VectorXd v(6);
-      Eigen::Vector3d w_b;
-
-      w_b = pose_.linear() * omega;
-      for ( int idx=0; idx<3; idx++ )
-      {
-        v(idx) = velocity(idx);
-        v(idx+3) = w_b(idx);
-      }
-
-      Eigen::JacobiSVD<Eigen::MatrixXd> svd_jac(jacobian_,  Eigen::ComputeThinU | Eigen::ComputeThinV);
-      ret = svd_jac.solve(v);
-
-
-      return true;
-    }
-
-    bool iiwaState::toJointVelocity(const Eigen::VectorXd& q, const Eigen::Vector3d& velocity, const Eigen::Vector3d& omega, Eigen::VectorXd& ret)
-    {
-
-      unsigned int nj = iiwa_tree_.getNrOfJoints();
-      KDL::JntArray jointpositions = KDL::JntArray(nj);
-      for(size_t i=0;i<nj;i++)
-        jointpositions(i) = q(i);
-
-      KDL::Frame cartpos;
-      Eigen::Affine3d pose;
-      bool kinematics_status = fksolver_->JntToCart(jointpositions,cartpos);
-      tf::transformKDLToEigen(cartpos, pose);
-
-      KDL::Jacobian jac;
-      jac.resize(iiwa_chain_.getNrOfJoints());
-      jacsolver_->JntToJac (jointpositions, jac );
-      Eigen::MatrixXd jacobian(6,7); jacobian.setZero();
-      assert( jac.columns() == 7 );
-      assert( jac.rows() == 6 );
-      for(size_t i=0; i<6; i++)
-        for(size_t j=0; j<7; j++)
-          jacobian(i,j) = jac(i,j);
-
-      Eigen::VectorXd v(6);
-      Eigen::Vector3d w_b;
-
-      w_b = pose.linear() * omega;
-      for ( int idx=0; idx<3; idx++ )
-      {
-        v(idx) = velocity(idx);
-        v(idx+3) = w_b(idx);
-      }
-
-      Eigen::JacobiSVD<Eigen::MatrixXd> svd_jac(jacobian,  Eigen::ComputeThinU | Eigen::ComputeThinV);
-      ret = svd_jac.solve(v);
-
-
-      return true;
-    }
-
-
-    bool iiwaState::isRunning() const { return running_; }
-
-    */
 }

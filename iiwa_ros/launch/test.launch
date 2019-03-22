@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<launch>
+
+   <!-- GDB Debug Option -->
+   <arg name="debug" default="false" />
+   <arg unless="$(arg debug)" name="launch_prefix" value="" />
+   <arg     if="$(arg debug)" name="launch_prefix"
+            value="gdb -x $(find iiwa_moveit)/launch/gdb_settings.gdb --ex run --args" />
+
+  <include file="$(find iiwa_description)/launch/iiwa14_upload.launch" />
+
+  <node launch-prefix="$(arg launch_prefix)" name="test_iiwa" pkg="iiwa_ros" type="test_fri" output="screen" >
+
+        <rosparam>
+          fri/filter/wrench/saturation          : [ 900., 900., 900., 900., 900., 900. ]
+          fri/filter/wrench/deadband            : [  1.5,  1.5,  1.5, 0.15, 0.15, 0.15 ]
+          fri/filter/wrench/cutoff_frequency_hz : 20
+
+          fri/filter/twist/saturation           : [   200.,   200.,   200.,   200.,   200.,   200. ]
+          fri/filter/twist/deadband             : [ 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001 ]
+          fri/filter/twist/cutoff_frequency_hz  : 20
+
+          fri/port                              : 30200
+          fri/hostname                          : 172.31.1.147
+          fri/timeout_ms                        : 5000
+          fri/cycle_time_s                      : 0.005
+          fri/robot_description_param           : "/robot_description"
+          fri/base_link                         : "iiwa_link_0"
+          fri/tool_link                         : "iiwa_link_ee"
+        </rosparam>
+    </node>
+
+</launch>

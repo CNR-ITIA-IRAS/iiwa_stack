@@ -58,9 +58,8 @@
 #include <kdl/frames_io.hpp>
 #include <eigen_conversions/eigen_kdl.h>
 #include <eigen_conversions/eigen_msg.h>
-#include <stdio.h>
 #include <iostream>
-
+#include <thread>
 #include <string>
 
 namespace iiwa_ros 
@@ -159,6 +158,7 @@ namespace iiwa_ros
   };
   
 
+  static const std::string FRI_STATE_PUBISHER_FREQ_HS_NS = "fir/state_publisher_freq_hz";
   
   class iiwaRos {
   public:
@@ -174,16 +174,14 @@ namespace iiwa_ros
      * @return void
      */
     void init ( double fri_cycle_time
-              , const double wrench_filter_frequency
-              , const Eigen::Vector6d& wrench_filter_deadband
-              , const double twist_filter_frequency
-              , const Eigen::Vector6d& twsit_filter_deadband
               , const bool verbosity = false );
     
     bool estimatePayload(const double estimation_time = 5, const double toll = 0.005);
     bool setWrenchOffset(const double estimation_time = 5 );
     
     double getFRICycleTime() const { return dt_;}
+    void  startFriPublisher() ;
+    void  stopFriPublisher();
     
     /**
      * @brief Returns true is a new Cartesian pose of the robot is available.
@@ -225,7 +223,7 @@ namespace iiwa_ros
      */
     bool getCartesianWrench(geometry_msgs::WrenchStamped& value, const char what = 'e', const bool filtered = true, const bool compensate_payload = true );
     
-    bool getCartesianTwist( geometry_msgs::TwistStamped twist, const char what = 'e', const bool filtered = true  );
+    bool getCartesianTwist( geometry_msgs::TwistStamped& twist, const char what = 'e', const bool filtered = true  );
     
     /**
      * @brief Returns true is a new Joint velocity of the robot is available.
@@ -351,14 +349,12 @@ namespace iiwa_ros
       Payload() : compensation_method(Payload::PAYLOAD_ESTIMATION), mass(0), distance(Eigen::Vector3d::Zero()), initializated(false),wrench_offset_b(Eigen::VectorXd(6).setZero() ){}
     } payload;
 
-    double dt_;                               ;
-    double wrench_filter_frequency_           ;
-    Eigen::Vector6d wrench_filter_deadband_   ;
-    double twist_filter_frequency_            ;
-    Eigen::Vector6d twist_filter_deadband_    ;
-    Eigen::Vector6d wrench_filter_saturation_ ; 
-    Eigen::Vector6d twist_filter_saturation_  ; 
-                   
+    double dt_;
+
+    bool stop_fri_publisher_thread_;
+    void friPublisherThread();
+    std::shared_ptr<std::thread> fri_publisher_thread_;
+
 };
   
 bool CHECK_CLOCK(const ros::Time& what, const std::string& msg)

@@ -39,25 +39,32 @@
 
 namespace iiwa_ros 
 {
-LBRJointOverlayClient::LBRJointOverlayClient( const std::string& robot_description
-                                            , const std::string& chain_root
-                                            , const std::string& chain_tip
-                                            , const size_t target_queue_lenght )
-  : command_joint_position_         ( target_queue_lenght )
-  , command_joint_torque_           ( target_queue_lenght )
-  , command_wrench_                 ( target_queue_lenght )
-  , last_joint_pos_command_         ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
-  , last_joint_torque_command_      ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
-  , initial_joints_                 ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
-  , joint_pos_command_              ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
-  , last_wrench_command_            ( 6, 0.0 )
-  , initial_wrench_                 ( 6, 0.0 )
-  , control_running_                ( false )
+LBRJointOverlayClient::LBRJointOverlayClient(const size_t target_queue_lenght )
+  : command_joint_position_      ( target_queue_lenght )
+  , command_joint_torque_        ( target_queue_lenght )
+  , command_wrench_              ( target_queue_lenght )
+  , last_joint_pos_command_      ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
+  , last_joint_torque_command_   ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
+  , initial_joints_              ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
+  , joint_pos_command_           ( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 )
+  , last_wrench_command_         ( 6, 0.0 )
+  , initial_wrench_              ( 6, 0.0 )
+  , control_running_             ( false )
+  , update_time_                 (ros::Time::now())
 {
 
   realtime_pub_.init( ros::NodeHandle("~"), "fri", 100);
 
   ros::NodeHandle nh("~");
+
+  std::string robot_description   ;
+  std::string robot_link_base     ;
+  std::string robot_tool_base     ;
+
+  if( !nh.getParam( ROBOT_DESCRIPTION_NS , robot_description ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), ROBOT_DESCRIPTION_NS .c_str()); throw std::runtime_error("Abort."); }
+  if( !nh.getParam( ROBOT_LINK_BASE_NS   , robot_link_base   ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), ROBOT_LINK_BASE_NS   .c_str()); throw std::runtime_error("Abort."); }
+  if( !nh.getParam( ROBOT_TOOL_BASE_NS   , robot_tool_base   ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), ROBOT_TOOL_BASE_NS   .c_str()); throw std::runtime_error("Abort."); }
+
   std::string robot_desc_string;
   nh.param(robot_description, robot_desc_string, std::string());
   if (!kdl_parser::treeFromString(robot_desc_string, iiwa_tree_))
@@ -66,11 +73,47 @@ LBRJointOverlayClient::LBRJointOverlayClient( const std::string& robot_descripti
      throw std::runtime_error("Failed to to construct kdl tree");
   }
 
-  iiwa_tree_.getChain ( chain_root, chain_tip, iiwa_chain_);
+  iiwa_tree_.getChain ( robot_link_base, robot_tool_base, iiwa_chain_);
   fksolver_.reset( new KDL::ChainFkSolverPos_recursive( iiwa_chain_ ) );
   jacsolver_.reset( new KDL::ChainJntToJacSolver( iiwa_chain_ ) );
 
   logger = std::thread( &LBRJointOverlayClient::loggerThread, this);
+
+  std::vector<double> wrench_deadband;
+  std::vector<double> wrench_saturation;
+  double              wrench_freq_hz;
+
+
+  std::vector<double> twist_deadband;
+  std::vector<double> twist_saturation;
+  double              twist_freq_hz;
+
+  if( !nh.getParam( WRENCH_FILTER_SATURATION_NS, wrench_saturation ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), WRENCH_FILTER_SATURATION_NS.c_str()); throw std::runtime_error("Abort."); }
+  if( !nh.getParam( WRENCH_FILTER_DEADBAND_NS  , wrench_deadband   ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), WRENCH_FILTER_DEADBAND_NS  .c_str()); throw std::runtime_error("Abort."); }
+  if( !nh.getParam( WRENCH_FILTER_FREQUENCY_NS , wrench_freq_hz    ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), WRENCH_FILTER_FREQUENCY_NS .c_str()); throw std::runtime_error("Abort."); }
+
+  if( !nh.getParam( TWIST_FILTER_SATURATION_NS, twist_saturation   ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), TWIST_FILTER_SATURATION_NS.c_str()) ; throw std::runtime_error("Abort."); }
+  if( !nh.getParam( TWIST_FILTER_DEADBAND_NS  , twist_deadband     ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), TWIST_FILTER_DEADBAND_NS  .c_str()) ; throw std::runtime_error("Abort."); }
+  if( !nh.getParam( TWIST_FILTER_FREQUENCY_NS , twist_freq_hz      ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), TWIST_FILTER_FREQUENCY_NS .c_str()) ; throw std::runtime_error("Abort."); }
+
+  if( !nh.getParam( FRI_CYCLE_TIME_S_NS       , fri_cycle_time_s_   ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), FRI_CYCLE_TIME_S_NS .c_str()) ; throw std::runtime_error("Abort."); }
+
+  double w_natural_frequency = wrench_freq_hz * 2 * M_PI ; // [rad/s]
+  wrench_b_filter_.init( Eigen::Vector6d( wrench_deadband.data() ), Eigen::Vector6d( wrench_saturation.data() ), w_natural_frequency,  fri_cycle_time_s_, Eigen::Vector6d::Zero() );
+
+  double t_natural_frequency = wrench_freq_hz * 2 * M_PI ; // [rad/s]
+  twist_b_filter_ .init( Eigen::Vector6d( twist_deadband.data()  ), Eigen::Vector6d( twist_saturation.data()  ), t_natural_frequency ,  fri_cycle_time_s_, Eigen::Vector6d::Zero() );
+
+  joint_position_prev_.resize(KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
+  joint_position_     .resize(KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
+  joint_torque_       .resize(KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
+  joint_velocity_     .resize(KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
+  jacobian_           .resize(6,KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
+
+  jacobian_       .setZero();
+  joint_velocity_ .setZero();
+  joint_torque_   .setZero();
+
 }
 
 LBRJointOverlayClient::~LBRJointOverlayClient( ) { }
@@ -142,7 +185,6 @@ void LBRJointOverlayClient::command()
   {
     if( command_joint_position_.empty() )
     {
-      //std::cout << to_string( last_joint_pos_command_ ) << std::endl;
       robotCommand().setJointPosition( &joint_pos_command_[0] );
     }
     else
@@ -162,7 +204,6 @@ void LBRJointOverlayClient::command()
     }
     else
     {
-      //std::cout << to_string( last_joint_pos_command_ ) << std::endl;
       last_joint_torque_command_ = command_joint_torque_.front();
       robotCommand().setTorque( &last_joint_torque_command_[0] );
       command_joint_torque_.pop_front();
@@ -240,15 +281,10 @@ bool LBRJointOverlayClient::newJointPosCommand( const std::vector< double >& new
   }
   else
   {
-    line_ = __LINE__;
     std::vector<double> command_joint_position = command_joint_position_.back();
     line_ = __LINE__;
-    if( diff( command_joint_position, new_joint_pos_command ) > 0.001 * M_PI / 180.0 )
-    {
-      line_ = __LINE__;
-      command_joint_position_.push_back( new_joint_pos_command );
-      line_ = __LINE__;
-    }
+    command_joint_position_.push_back( new_joint_pos_command );
+    line_ = __LINE__;
   }
   return true;
 }
@@ -335,8 +371,6 @@ void LBRJointOverlayClient::newWrenchCommand( const std::vector< double >& new_w
   }
   command_wrench_.push_back( new_wrench_command );
 
-//       std::cout<< "new commandded wrench: " << new_wrench_command[0] << "; " << new_wrench_command[1] << "; " << new_wrench_command[2] << "; " << std::endl;
-
   return;
 }
 
@@ -346,172 +380,80 @@ void LBRJointOverlayClient::getState(KUKA::FRI::ESessionState& oldState, KUKA::F
   newState = actual_state_;
 }
 
-bool LBRJointOverlayClient::getJointPosition( std::vector< double >& joint_pos )
+bool LBRJointOverlayClient::getJointPosition(Eigen::VectorXd &joint_pos ) const
 {
-    const KUKA::FRI::LBRState& state = LBRClient::robotState();
-    const double* jp = state.getMeasuredJointPosition();
-    joint_pos.resize(KUKA::FRI::LBRState::NUMBER_OF_JOINTS,0);
-    for(size_t i=0;i<KUKA::FRI::LBRState::NUMBER_OF_JOINTS;i++)
-      joint_pos.at(i) = jp[i];
-
+    joint_pos = joint_position_;
     return true;
 }
 
-bool LBRJointOverlayClient::getJointPosition ( iiwa_msgs::JointPosition& value )
+bool LBRJointOverlayClient::getJointPosition ( iiwa_msgs::JointPosition& value ) const
 {
-  std::vector<double> jp(KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
-  if(! getJointPosition(jp) )
-    return false;
-  value.position.a1 = jp[0] ;
-  value.position.a2 = jp[1] ;
-  value.position.a3 = jp[2] ;
-  value.position.a4 = jp[3] ;
-  value.position.a5 = jp[4] ;
-  value.position.a6 = jp[5] ;
-  value.position.a7 = jp[6] ;
-
-  value.header.stamp = ros::Time::now();
+  value.position.a1 = joint_position_( 0 ) ;
+  value.position.a2 = joint_position_( 1 ) ;
+  value.position.a3 = joint_position_( 2 ) ;
+  value.position.a4 = joint_position_( 3 ) ;
+  value.position.a5 = joint_position_( 4 ) ;
+  value.position.a6 = joint_position_( 5 ) ;
+  value.position.a7 = joint_position_( 6 ) ;
+  value.header.stamp = update_time_;
   return true;
 }
 
-bool LBRJointOverlayClient::getJointTorque( std::vector< double >& joint_tau )
+bool LBRJointOverlayClient::getJointTorque( Eigen::VectorXd& joint_tau ) const
 {
-    const KUKA::FRI::LBRState& state = LBRClient::robotState();
-    const double* tau = state.getMeasuredTorque();
-    joint_tau.resize(KUKA::FRI::LBRState::NUMBER_OF_JOINTS,0);
-    for(size_t i=0;i<KUKA::FRI::LBRState::NUMBER_OF_JOINTS;i++)
-      joint_tau.at(i) = tau[i];
-
+    joint_tau = joint_torque_;
     return true;
 }
 
-bool LBRJointOverlayClient::getJointTorque ( iiwa_msgs::JointTorque& value )
+bool LBRJointOverlayClient::getJointTorque ( iiwa_msgs::JointTorque& value ) const
 {
-  std::vector<double> tau(KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
-  if(! getJointTorque(tau) )
-    return false;
-  value.torque.a1 = tau[0] ;
-  value.torque.a2 = tau[1] ;
-  value.torque.a3 = tau[2] ;
-  value.torque.a4 = tau[3] ;
-  value.torque.a5 = tau[4] ;
-  value.torque.a6 = tau[5] ;
-  value.torque.a7 = tau[6] ;
-  value.header.stamp = ros::Time::now();
+  value.torque.a1 = joint_torque_( 0 ) ;
+  value.torque.a2 = joint_torque_( 1 ) ;
+  value.torque.a3 = joint_torque_( 2 ) ;
+  value.torque.a4 = joint_torque_( 3 ) ;
+  value.torque.a5 = joint_torque_( 4 ) ;
+  value.torque.a6 = joint_torque_( 5 ) ;
+  value.torque.a7 = joint_torque_( 6 ) ;
+  value.header.stamp = update_time_;
   return true;
 }
 
-bool LBRJointOverlayClient::getJointVelocity( std::vector< double >& joint_vel )
+bool LBRJointOverlayClient::getJointVelocity(Eigen::VectorXd &joint_vel ) const
 {
-  static int first_entry = 1;
-  static timespec act_time_prev;
-  static double jp_prev[KUKA::FRI::LBRState::NUMBER_OF_JOINTS] = {0};
-
-  joint_vel.resize(KUKA::FRI::LBRState::NUMBER_OF_JOINTS,0.0);
-
-  const KUKA::FRI::LBRState& state = LBRClient::robotState();
-  const double*              jp   =  state.getMeasuredJointPosition();
-  if( first_entry )
-  {
-      first_entry = 0;
-      clock_gettime(CLOCK_MONOTONIC, &act_time_prev);
-      std::memcpy(&jp_prev, jp, sizeof(double) * KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
-      return true;
-  }
-
-  timespec act_time;
-  clock_gettime(CLOCK_MONOTONIC, &act_time);
-  const double dt = timer_difference_s(&act_time, &act_time_prev);
-  joint_vel.resize(KUKA::FRI::LBRState::NUMBER_OF_JOINTS,0);
-  for(size_t i=0;i<KUKA::FRI::LBRState::NUMBER_OF_JOINTS;i++)
-      joint_vel.at(i) = ( jp[i] - jp_prev[i] ) / dt;
-
-  std::memcpy(&jp_prev, jp, sizeof(double) * KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
-  act_time_prev.tv_sec  = act_time.tv_sec;
-  act_time_prev.tv_nsec = act_time.tv_nsec;
+  joint_vel = joint_velocity_;
   return true;
 }
 
-bool LBRJointOverlayClient::getJointVelocity ( iiwa_msgs::JointVelocity& value )
+bool LBRJointOverlayClient::getJointVelocity ( iiwa_msgs::JointVelocity& value ) const
 {
-  std::vector<double> jv(KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
-  if(! getJointVelocity(jv) )
-    return false;
-  value.velocity.a1 = jv[0] ;
-  value.velocity.a2 = jv[1] ;
-  value.velocity.a3 = jv[2] ;
-  value.velocity.a4 = jv[3] ;
-  value.velocity.a5 = jv[4] ;
-  value.velocity.a6 = jv[5] ;
-  value.velocity.a7 = jv[6] ;
-
-  value.header.stamp = ros::Time::now();
+  value.velocity.a1 = joint_velocity_( 0 ) ;
+  value.velocity.a2 = joint_velocity_( 1 ) ;
+  value.velocity.a3 = joint_velocity_( 2 ) ;
+  value.velocity.a4 = joint_velocity_( 3 ) ;
+  value.velocity.a5 = joint_velocity_( 4 ) ;
+  value.velocity.a6 = joint_velocity_( 5 ) ;
+  value.velocity.a7 = joint_velocity_( 6 ) ;
+  value.header.stamp = update_time_;
   return true;
 }
 
-bool LBRJointOverlayClient::getCartesianPose( Eigen::Affine3d& pose )
+bool LBRJointOverlayClient::getCartesianPose( Eigen::Affine3d& pose ) const
 {
-    const KUKA::FRI::LBRState& state = LBRClient::robotState();
-    const double* jp = state.getMeasuredJointPosition();
-
-    KDL::Frame      fr;
-    unsigned int    nj = iiwa_tree_.getNrOfJoints();
-    KDL::JntArray   ja = KDL::JntArray(nj);
-    for(size_t i=0;i<KUKA::FRI::LBRState::NUMBER_OF_JOINTS;i++)
-      ja(i) = jp[i];
-
-    bool kinematics_status = fksolver_->JntToCart(ja,fr);
-    tf::transformKDLToEigen(fr, pose );
-
-    return true;
-}
-
-bool LBRJointOverlayClient::getCartesianPose ( geometry_msgs::PoseStamped& value )
-{
-  Eigen::Affine3d pose;
-  if(! getCartesianPose(pose) )
-    return false;
-  tf::poseEigenToMsg(pose, value.pose);
-  value.header.stamp = ros::Time::now();
+  pose = cartesian_pose_;
   return true;
 }
 
-bool LBRJointOverlayClient::getCartesianWrench( Eigen::VectorXd& wrench, const char frame )
+bool LBRJointOverlayClient::getCartesianPose ( geometry_msgs::PoseStamped& value ) const
 {
-    const KUKA::FRI::LBRState& state = LBRClient::robotState();
-    const double* jp  = state.getMeasuredJointPosition();
-    const double* tau = state.getExternalTorque();
-    Eigen::VectorXd torque(7);
-    for(size_t i=0;i<KUKA::FRI::LBRState::NUMBER_OF_JOINTS;i++)
-      torque(i) = tau[i];
+  tf::poseEigenToMsg(cartesian_pose_, value.pose);
+  value.header.stamp = update_time_;
+  return true;
+}
 
-    //-------------------
-    Eigen::Affine3d pose;
-    KDL::Frame      fr;
-    unsigned int    nj = iiwa_tree_.getNrOfJoints();
-    KDL::JntArray   ja = KDL::JntArray(nj);
-    for(size_t i=0;i<KUKA::FRI::LBRState::NUMBER_OF_JOINTS;i++)
-      ja(i) = jp[i];
+bool LBRJointOverlayClient::getCartesianWrench( Eigen::VectorXd& wrench, const char frame, const bool filtered ) const
+{
 
-    bool kinematics_status = fksolver_->JntToCart(ja,fr);
-    tf::transformKDLToEigen(fr, pose );
-
-
-    //-------------------
-    KDL::Jacobian jac;
-    jac.resize(iiwa_chain_.getNrOfJoints());
-    jacsolver_->JntToJac (ja, jac );
-    Eigen::MatrixXd jacobian(6,7); jacobian.setZero();
-    assert( jac.columns() == 7 );
-    assert( jac.rows() == 6 );
-    for(size_t i=0; i<6; i++)
-      for(size_t j=0; j<7; j++)
-        jacobian(i,j) = jac(i,j);
-    //-------------------
-
-    Eigen::MatrixXd pinv = jacobian.completeOrthogonalDecomposition().pseudoInverse();
-
-    Eigen::VectorXd wrench_b = pinv.transpose() * torque;
+    Eigen::VectorXd wrench_b = filtered ? filtered_wrench_b_ : raw_wrench_b_;
     if( frame == 'b')
     {
       wrench = wrench_b;
@@ -522,18 +464,17 @@ bool LBRJointOverlayClient::getCartesianWrench( Eigen::VectorXd& wrench, const c
       wrench.setZero();
       Eigen::Vector3d f; f << wrench_b(0),wrench_b(1),wrench_b(2);
       Eigen::Vector3d t; t << wrench_b(3),wrench_b(4),wrench_b(5);
-      f = pose.linear().transpose() * f;
-      t = pose.linear().transpose() * t;
+      f = cartesian_pose_.linear().transpose() * f;
+      t = cartesian_pose_.linear().transpose() * t;
       wrench << f(0),f(1),f(2),t(0),t(1),t(2);
     }
-
     return true;
 }
 
-bool LBRJointOverlayClient::getCartesianWrench ( geometry_msgs::WrenchStamped& value, const char frame  )
+bool LBRJointOverlayClient::getCartesianWrench (geometry_msgs::WrenchStamped& value, const char frame  , const bool filtered)
 {
   Eigen::VectorXd wrench(7); wrench.setZero();
-  if(! getCartesianWrench(wrench, frame)  )
+  if(! getCartesianWrench(wrench, frame, filtered )  )
     return false;
 
   value.wrench.force.x  = wrench(0);
@@ -543,47 +484,128 @@ bool LBRJointOverlayClient::getCartesianWrench ( geometry_msgs::WrenchStamped& v
   value.wrench.torque.y = wrench(4);
   value.wrench.torque.z = wrench(5);
 
-  value.header.stamp = ros::Time::now();
+  value.header.stamp = update_time_;
   return true;
 }
 
-bool LBRJointOverlayClient::getJacobian(Eigen::MatrixXd& value)
+bool LBRJointOverlayClient::getJacobian(Eigen::MatrixXd& value) const
  {
-   const KUKA::FRI::LBRState& state = LBRClient::robotState();
-   const double* jp  = state.getMeasuredJointPosition();
-
-   KDL::Frame      fr;
-   unsigned int    nj = iiwa_tree_.getNrOfJoints();
-   KDL::JntArray   ja = KDL::JntArray(nj);
-   for(size_t i=0;i<KUKA::FRI::LBRState::NUMBER_OF_JOINTS;i++)
-     ja(i) = jp[i];
-
-   KDL::Jacobian jac;
-   jac.resize(iiwa_chain_.getNrOfJoints());
-   jacsolver_->JntToJac (ja, jac );
-   value.resize(6,7);
-   value.setZero();
-   for(size_t i=0; i<6; i++)
-     for(size_t j=0; j<7; j++)
-       value(i,j) = jac(i,j);
-
+   value = jacobian_;
    return true;
  }
 
-void LBRJointOverlayClient::getCartesianVelocity( Eigen::Affine3d& pose )
+bool LBRJointOverlayClient::getCartesianTwist(Eigen::Vector6d &twist , const char frame, const bool filtered) const
 {
-    const KUKA::FRI::LBRState& state = LBRClient::robotState();
-    const double* jp = state.getMeasuredJointPosition();
-
-    KDL::Frame      fr;
-    unsigned int    nj = iiwa_tree_.getNrOfJoints();
-    KDL::JntArray   ja = KDL::JntArray(nj);
-    for(size_t i=0;i<KUKA::FRI::LBRState::NUMBER_OF_JOINTS;i++)
-      ja(i) = jp[i];
-
-    bool kinematics_status = fksolver_->JntToCart(ja,fr);
-    tf::transformKDLToEigen(fr, pose );
+  Eigen::VectorXd twist_b = filtered ? filtered_twist_b_ : raw_twist_b_;
+  if( frame == 'b')
+  {
+    twist = twist_b;
+  }
+  else
+  {
+    twist.resize(6);
+    twist.setZero();
+    Eigen::Vector3d v; v << twist_b(0),twist_b(1),twist_b(2);
+    Eigen::Vector3d o; o << twist_b(3),twist_b(4),twist_b(5);
+    v = cartesian_pose_.linear().transpose() * v;
+    o = cartesian_pose_.linear().transpose() * o;
+    twist << v(0),v(1),v(2),o(0),o(1),o(2);
+  }
+  return true;
 }
+
+bool LBRJointOverlayClient::getCartesianTwist( geometry_msgs::TwistStamped& value, const char frame, const bool filtered) const
+{
+  Eigen::Vector6d twist; twist.setZero();
+  if(! getCartesianTwist(twist, frame, filtered )  )
+    return false;
+
+  value.twist.linear.x  = twist(0);
+  value.twist.linear.y  = twist(1);
+  value.twist.linear.z  = twist(2);
+  value.twist.angular.x = twist(3);
+  value.twist.angular.y = twist(4);
+  value.twist.angular.z = twist(5);
+
+  value.header.stamp = update_time_;
+  return true;
+}
+
+
+bool LBRJointOverlayClient::updatetFirstOrderKinematic( )
+{
+  static bool first_entry = true;
+
+  const KUKA::FRI::LBRState& state = LBRClient::robotState();
+  const double*                jp  = state.getMeasuredJointPosition();
+
+  update_time_ = ros::Time::now();
+
+  //////// VELOCITY
+  Eigen::VectorXd joint_Velocity_prev; joint_Velocity_prev.resize(7);
+  for(size_t i=0;i<KUKA::FRI::LBRState::NUMBER_OF_JOINTS;i++)
+  {
+    joint_position_(i) = jp[i];
+  }
+
+  if( first_entry )
+  {
+    for(size_t i=0;i<KUKA::FRI::LBRState::NUMBER_OF_JOINTS;i++)
+    {
+      joint_position_prev_(i) = jp[i];
+    }
+    first_entry = false;
+  }
+  joint_velocity_ = ( joint_position_- joint_position_prev_ ) / fri_cycle_time_s_;
+  ROS_INFO_STREAM_THROTTLE(5,"---\njp     : " << joint_position_.transpose()
+                             << "\njp_prev: " << joint_position_prev_.transpose()
+                             << "\ndjp    : " << (joint_position_-joint_position_prev_).transpose()
+                             << "\ndt     : " << fri_cycle_time_s_
+                             << "\njv     : " << joint_velocity_.transpose() );
+  joint_position_prev_ = joint_position_;
+  //////// VELOCITY
+
+  //////// TORQUE
+  const double* tau = state.getExternalTorque();
+  for(size_t i=0;i<KUKA::FRI::LBRState::NUMBER_OF_JOINTS;i++)
+    joint_torque_(i) = tau[i];
+  //////// TORQUE
+
+  //////// POSE
+  KDL::Frame      fr;
+  unsigned int    nj = iiwa_tree_.getNrOfJoints();
+  KDL::JntArray   ja = KDL::JntArray(nj);
+  for(size_t i=0;i<KUKA::FRI::LBRState::NUMBER_OF_JOINTS;i++)
+    ja(i) = jp[i];
+
+  bool kinematics_status = fksolver_->JntToCart(ja,fr);
+  tf::transformKDLToEigen(fr, cartesian_pose_ );
+  //////// POSE
+
+  //////// JACOBIAN
+  KDL::Jacobian jac;
+  jac.resize(iiwa_chain_.getNrOfJoints());
+  jacsolver_->JntToJac (ja, jac );
+
+  assert( jac.columns() == 7 );
+  assert( jac.rows() == 6 );
+  for(size_t i=0; i<6; i++)
+    for(size_t j=0; j<7; j++)
+      jacobian_(i,j) = jac(i,j);
+  //////// JACOBIAN
+
+  Eigen::MatrixXd pinv = jacobian_.completeOrthogonalDecomposition().pseudoInverse();
+
+  raw_wrench_b_ = pinv.transpose() * joint_torque_;
+  filtered_wrench_b_ = wrench_b_filter_.update( raw_wrench_b_ );
+
+  raw_twist_b_ = jacobian_ * joint_velocity_;
+  filtered_twist_b_ = twist_b_filter_.update( raw_twist_b_ );
+
+  return true;
+}
+
+
 
 bool LBRJointOverlayClient::isControlRunning( ) const { return control_running_; }
 
@@ -596,15 +618,19 @@ bool LBRJointOverlayClient::isControlRunning( ) const { return control_running_;
  * @param chain_root
  * @param chain_tip
  */
-LBROverlayApp::LBROverlayApp( const int& port, const std::string& hostname, int connection_timeout_ms, const std::string& robot_description, const std::string& chain_root, const std::string& chain_tip  )
-    : port_      ( port )
-    , hostname_  ( hostname )
-    , connection_( connection_timeout_ms )
-    , client_    ( robot_description, chain_root, chain_tip )
-    , active_    ( false )
-  {
-    connect();  
-  }
+LBROverlayApp::LBROverlayApp()
+: active_    ( false )
+{
+
+  ros::NodeHandle nh("~");
+  if( !nh.getParam( FRI_PORT_NS          , fri_port_        ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), FRI_PORT_NS          .c_str()); throw std::runtime_error("Abort."); }
+  if( !nh.getParam( FRI_HOSTNAME_NS      , fri_hostname_    ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), FRI_HOSTNAME_NS      .c_str()); throw std::runtime_error("Abort."); }
+  if( !nh.getParam( FRI_TIMEOUT_MS_NS    , fri_timeout_ms_  ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), FRI_TIMEOUT_MS_NS    .c_str()); throw std::runtime_error("Abort."); }
+
+  connection_.reset( new KUKA::FRI::UdpConnection( (unsigned int)fri_timeout_ms_ ) );
+  connect();
+}
+
 /**
  * @brief LBROverlayApp::~LBROverlayApp
  */
@@ -619,11 +645,11 @@ LBROverlayApp::~LBROverlayApp( )
  */
 void LBROverlayApp::connect()
 {
-  ROS_WARN("FRI Connect to %s:%d ", hostname_.c_str(), port_ );
-  app_.reset(new KUKA::FRI::ClientApplication(connection_, client_) );
-  if( !app_->connect(port_, hostname_.size() > 0 ? hostname_.c_str() : nullptr ) )
+  ROS_WARN("FRI Connect to %s:%d ", fri_hostname_.c_str(), fri_port_ );
+  app_.reset(new KUKA::FRI::ClientApplication(*connection_, client_) );
+  if( !app_->connect(fri_port_, fri_hostname_.size() > 0 ? fri_hostname_.c_str() : nullptr ) )
   {
-    throw std::runtime_error( ("Error in FRI Connection (" + hostname_ + ":" + std::to_string( port_ ) ).c_str() );
+    throw std::runtime_error( ("Error in FRI Connection (" + fri_hostname_ + ":" + std::to_string( fri_port_ ) ).c_str() );
   }
   stop_fri_command_thread_ = false;
   command_thread_.reset( new boost::thread(boost::bind(&LBROverlayApp::step, this)) );
@@ -662,11 +688,12 @@ void LBROverlayApp::step()
       KUKA::FRI::EConnectionQuality quality = client_.robotState().getConnectionQuality();
       switch( quality )
       {
-         case KUKA::FRI::POOR      : ROS_FATAL_THROTTLE(5, "** POOR ** FRI COMMUNICATION STATE     " ); break;
-         case KUKA::FRI::FAIR      : ROS_WARN_THROTTLE (5, "** FAIR ** FRI COMMUNICATION STATE     " ); break;
-         case KUKA::FRI::GOOD      : ROS_WARN_THROTTLE (5, "** GOOD ** FRI COMMUNICATION STATE     " ); break;
-         case KUKA::FRI::EXCELLENT : ROS_INFO_THROTTLE (5, "** EXCELLENT** FRI COMMUNICATION STATE     " ); break;
+        case KUKA::FRI::POOR      : ROS_FATAL_THROTTLE(5, "** POOR ** FRI COMMUNICATION STATE     " ); break;
+        case KUKA::FRI::FAIR      : ROS_WARN_THROTTLE (5, "** FAIR ** FRI COMMUNICATION STATE     " ); break;
+        case KUKA::FRI::GOOD      : ROS_WARN_THROTTLE (5, "** GOOD ** FRI COMMUNICATION STATE     " ); break;
+        case KUKA::FRI::EXCELLENT : ROS_INFO_THROTTLE (5, "** EXCELLENT** FRI COMMUNICATION STATE " ); break;
       }
+
       KUKA::FRI::ESessionState oldState, newState;
       client_.getState(oldState,newState);
       if( client_.isControlRunning() && ((int)oldState > (int)KUKA::FRI::IDLE) && ( newState == KUKA::FRI::IDLE ) )
@@ -674,7 +701,13 @@ void LBROverlayApp::step()
        ROS_WARN("Shutdown transition detected.(%d/%d)", (int) oldState, (int)newState );
       }
       active_ = (newState == KUKA::FRI::COMMANDING_ACTIVE);
-
+      if( active_ )
+      {
+        if(! client_.updatetFirstOrderKinematic( ) )
+        {
+          ROS_FATAL_THROTTLE(2,"Error in update the kinematics and static update....");
+        }
+      }
       success = app_->step();
     }
     else

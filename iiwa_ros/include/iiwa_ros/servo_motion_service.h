@@ -70,54 +70,32 @@ public:
      *
      * @return bool - false is service call fails.
      */
-    bool setFRIJointPositionControlMode  ( const int port
-                                         , const std::string hostname
-                                         , int connection_timeout_ms
-                                         , const std::string& robot_description
-                                         , const std::string& chain_root
-                                         , const std::string& chain_tip  );
+    bool setFRIJointPositionControlMode  ( );
     
     /**
      * @brief Sets the control mode to PositionControl.
      *
      * @return bool - false is service call fails.
      */
-    bool setFRIJointImpedanceControlMode( const int port
-                                          , const std::string hostname
-                                          , int connection_timeout_ms
-                                          , const iiwa_msgs::JointQuantity& joint_stiffnes
-                                          , const iiwa_msgs::JointQuantity& joint_damping
-                                          , const std::string& robot_description
-                                          , const std::string& chain_root
-                                          , const std::string& chain_tip);
+    bool setFRIJointImpedanceControlMode( const iiwa_msgs::JointQuantity& joint_stiffnes
+                                        , const iiwa_msgs::JointQuantity& joint_damping);
     
     /**
      * @brief Sets the control mode to PositionControl.
      *
      * @return bool - false is service call fails.
      */
-    bool setFRIJointTorqueControlMode( const int port
-                                       , const std::string hostname
-                                       , int connection_timeout_ms
-                                       , const iiwa_msgs::JointQuantity& joint_stiffnes
-                                       , const iiwa_msgs::JointQuantity& joint_damping
-                                       , const std::string& robot_description
-                                       , const std::string& chain_root
-                                       , const std::string& chain_tip);
+    bool setFRIJointTorqueControlMode(const iiwa_msgs::JointQuantity& joint_stiffnes
+                                       , const iiwa_msgs::JointQuantity& joint_damping );
     
     /**
      * @brief Sets the control mode to PositionControl.
      *
      * @return bool - false is service call fails.
      */
-    bool setFRIWrenchControlMode( const int port
-                                  , const std::string hostname
-                                  , int connection_timeout_ms
-                                  , const iiwa_msgs::CartesianQuantity& cart_stiffnes
+    bool setFRIWrenchControlMode( const iiwa_msgs::CartesianQuantity& cart_stiffnes
                                   , const iiwa_msgs::CartesianQuantity& cart_damping
-                                  , const std::string& robot_description
-                                  , const std::string& chain_root
-                                  , const std::string& chain_tip);
+                                  );
     
     std::shared_ptr< iiwa_ros::LBROverlayApp >& getFRIApp( ) { return fri_app_; }
     

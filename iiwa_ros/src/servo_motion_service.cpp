@@ -110,12 +110,7 @@ void ServoMotion::initSinePatternMode ( const int cartesian_dof, const double fr
     initCartesianLimits ( max_path_deviation, max_cartesian_velocity, max_control_force, max_control_force_stop );
 }
 
-bool ServoMotion::setFRIJointPositionControlMode( const int port
-                                                , const std::string hostname
-                                                , int connection_timeout_ms
-                                                , const std::string& robot_description
-                                                , const std::string& chain_root
-                                                , const std::string& chain_tip  )
+bool ServoMotion::setFRIJointPositionControlMode( )
 {
 #if defined( ENABLE_FRI )
   /*
@@ -127,7 +122,7 @@ bool ServoMotion::setFRIJointPositionControlMode( const int port
     ros::Duration(0.5).sleep();
   */
     if( fri_app_ == nullptr )
-      fri_app_.reset( new iiwa_ros::LBROverlayApp( port, hostname, connection_timeout_ms, robot_description, chain_root, chain_tip  )  );
+      fri_app_.reset( new iiwa_ros::LBROverlayApp(  )  );
     //config_.request.control_mode = 5;
     return true ; // callService();
 #else
@@ -135,11 +130,8 @@ bool ServoMotion::setFRIJointPositionControlMode( const int port
 #endif
 }
 
-bool ServoMotion::setFRIJointImpedanceControlMode(const int port
-                                                 , const std::string hostname
-                                                 , int connection_timeout_ms
-                                                 , const iiwa_msgs::JointQuantity& joint_stiffnes
-                                                , const iiwa_msgs::JointQuantity& joint_damping , const std::string &robot_description, const std::string &chain_root, const std::string &chain_tip)
+bool ServoMotion::setFRIJointImpedanceControlMode(const iiwa_msgs::JointQuantity& joint_stiffnes
+                                                , const iiwa_msgs::JointQuantity& joint_damping )
 {
 #if defined( ENABLE_FRI )
     
@@ -150,7 +142,7 @@ bool ServoMotion::setFRIJointImpedanceControlMode(const int port
     }
     ros::Duration(0.5).sleep();
     if( fri_app_ == nullptr )
-      fri_app_.reset( new iiwa_ros::LBROverlayApp( port, hostname, connection_timeout_ms, robot_description, chain_root, chain_tip  )  );
+      fri_app_.reset( new iiwa_ros::LBROverlayApp(  )  );
     config_.request.control_mode = 7;
     return callService();
 #else
@@ -158,7 +150,7 @@ bool ServoMotion::setFRIJointImpedanceControlMode(const int port
 #endif
 }
 
-bool ServoMotion::setFRIJointTorqueControlMode(const int port, const std::string hostname, int connection_timeout_ms, const iiwa_msgs::JointQuantity& joint_stiffnes, const iiwa_msgs::JointQuantity& joint_damping , const std::string &robot_description, const std::string &chain_root, const std::string &chain_tip)
+bool ServoMotion::setFRIJointTorqueControlMode(const iiwa_msgs::JointQuantity& joint_stiffnes, const iiwa_msgs::JointQuantity& joint_damping )
 {
 #if defined( ENABLE_FRI )
   
@@ -169,7 +161,7 @@ bool ServoMotion::setFRIJointTorqueControlMode(const int port, const std::string
     }
     ros::Duration(0.5).sleep();
     if( fri_app_ == nullptr )
-      fri_app_.reset( new iiwa_ros::LBROverlayApp( port, hostname, connection_timeout_ms, robot_description, chain_root, chain_tip  )  );
+      fri_app_.reset( new iiwa_ros::LBROverlayApp(  )  );
     config_.request.control_mode = 6;
     return callService();
 #else
@@ -177,7 +169,7 @@ bool ServoMotion::setFRIJointTorqueControlMode(const int port, const std::string
 #endif
 }
 
-bool ServoMotion::setFRIWrenchControlMode(const int port, const std::string hostname, int connection_timeout_ms, const iiwa_msgs::CartesianQuantity& cart_stiffnes, const iiwa_msgs::CartesianQuantity& cart_damping , const std::string &robot_description, const std::string &chain_root, const std::string &chain_tip)
+bool ServoMotion::setFRIWrenchControlMode(const iiwa_msgs::CartesianQuantity& cart_stiffnes, const iiwa_msgs::CartesianQuantity& cart_damping )
 {
 #if defined( ENABLE_FRI )
   
@@ -188,7 +180,7 @@ bool ServoMotion::setFRIWrenchControlMode(const int port, const std::string host
 //     }
     ros::Duration(0.5).sleep();
     if( fri_app_ == nullptr )
-      fri_app_.reset( new iiwa_ros::LBROverlayApp( port, hostname, connection_timeout_ms, robot_description, chain_root, chain_tip )  );
+      fri_app_.reset( new iiwa_ros::LBROverlayApp(  )  );
     config_.request.control_mode = 8;
     return callService();
 #else
