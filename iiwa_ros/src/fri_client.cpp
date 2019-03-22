@@ -320,11 +320,6 @@ void LBRJointOverlayClient::newJointTorqueCommand( const iiwa_msgs::JointTorque&
 
 void LBRJointOverlayClient::newJointTorqueCommand( const std::vector< double >& new_joint_torque_command )
 {
-  while( robotState().getSessionState() != KUKA::FRI::COMMANDING_ACTIVE )
-  {
-    ros::Duration(0.005).sleep();
-  }
-
   if( robotState().getClientCommandMode() != KUKA::FRI::TORQUE )
   {
     ROS_WARN_STREAM(ros::Time::now() << " fri_client.h - wrong command state in newJointTorqueCommand ");
@@ -557,11 +552,11 @@ bool LBRJointOverlayClient::updatetFirstOrderKinematic( )
     first_entry = false;
   }
   joint_velocity_ = ( joint_position_- joint_position_prev_ ) / fri_cycle_time_s_;
-  ROS_INFO_STREAM_THROTTLE(5,"---\njp     : " << joint_position_.transpose()
-                             << "\njp_prev: " << joint_position_prev_.transpose()
-                             << "\ndjp    : " << (joint_position_-joint_position_prev_).transpose()
-                             << "\ndt     : " << fri_cycle_time_s_
-                             << "\njv     : " << joint_velocity_.transpose() );
+//  ROS_INFO_STREAM_THROTTLE(5,"---\njp     : " << joint_position_.transpose()
+//                             << "\njp_prev: " << joint_position_prev_.transpose()
+//                             << "\ndjp    : " << (joint_position_-joint_position_prev_).transpose()
+//                             << "\ndt     : " << fri_cycle_time_s_
+//                             << "\njv     : " << joint_velocity_.transpose() );
   joint_position_prev_ = joint_position_;
   //////// VELOCITY
 
