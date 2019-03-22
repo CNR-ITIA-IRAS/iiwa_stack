@@ -118,17 +118,18 @@ bool ServoMotion::setFRIJointPositionControlMode( const int port
                                                 , const std::string& chain_tip  )
 {
 #if defined( ENABLE_FRI )
+  /*
     if( !setPositionControlMode(  ) )
     {
       ROS_ERROR("Failed in setting the position control mode for FRIpos. ");
       return false;
     }
     ros::Duration(0.5).sleep();
-  
+  */
     if( fri_app_ == nullptr )
       fri_app_.reset( new iiwa_ros::LBROverlayApp( port, hostname, connection_timeout_ms, robot_description, chain_root, chain_tip  )  );
-    config_.request.control_mode = 5;
-    return callService();
+    //config_.request.control_mode = 5;
+    return true ; // callService();
 #else
   #error "ENABLE_FRI is set to off in compilation configuration. Check it."
 #endif

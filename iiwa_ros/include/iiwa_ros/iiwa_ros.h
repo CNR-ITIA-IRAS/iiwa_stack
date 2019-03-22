@@ -61,9 +61,7 @@
 #include <stdio.h>
 #include <iostream>
 
-#include <eigen3/Eigen/Core>
 #include <string>
-#include <mutex>
 
 namespace iiwa_ros 
 {
@@ -162,7 +160,6 @@ namespace iiwa_ros
   
 
   
-  
   class iiwaRos {
   public:
     
@@ -176,9 +173,15 @@ namespace iiwa_ros
      * 
      * @return void
      */
-    void init(double fri_cycle_time, const bool verbosity = false );
+    void init ( double fri_cycle_time
+              , const double wrench_filter_frequency
+              , const Eigen::Vector6d& wrench_filter_deadband
+              , const double twist_filter_frequency
+              , const Eigen::Vector6d& twsit_filter_deadband
+              , const bool verbosity = false );
     
     bool estimatePayload(const double estimation_time = 5, const double toll = 0.005);
+    bool setWrenchOffset(const double estimation_time = 5 );
     
     double getFRICycleTime() const { return dt_;}
     
@@ -220,7 +223,9 @@ namespace iiwa_ros
      * @param value the current cartesian wrench of the robot.
      * @return bool
      */
-    bool getCartesianWrench(geometry_msgs::WrenchStamped& value, const char what = 'e', const bool compensate_payload = true );
+    bool getCartesianWrench(geometry_msgs::WrenchStamped& value, const char what = 'e', const bool filtered = true, const bool compensate_payload = true );
+    
+    bool getCartesianTwist( geometry_msgs::TwistStamped twist, const char what = 'e', const bool filtered = true  );
     
     /**
      * @brief Returns true is a new Joint velocity of the robot is available.
@@ -337,17 +342,25 @@ namespace iiwa_ros
     TimeToDestinationService time_to_destination_service_;
     struct Payload
     {
+      enum CompensationMethod { PAYLOAD_ESTIMATION, OFFSET_ESTIMATION };
+      CompensationMethod compensation_method;
       double mass;
       Eigen::Vector3d distance;
       bool initializated;
-      Payload() : mass(0), distance(Eigen::Vector3d::Zero()), initializated(false) {}
+      Eigen::VectorXd wrench_offset_b;
+      Payload() : compensation_method(Payload::PAYLOAD_ESTIMATION), mass(0), distance(Eigen::Vector3d::Zero()), initializated(false),wrench_offset_b(Eigen::VectorXd(6).setZero() ){}
     } payload;
 
-    double dt_;
-
-  };
-
-
+    double dt_;                               ;
+    double wrench_filter_frequency_           ;
+    Eigen::Vector6d wrench_filter_deadband_   ;
+    double twist_filter_frequency_            ;
+    Eigen::Vector6d twist_filter_deadband_    ;
+    Eigen::Vector6d wrench_filter_saturation_ ; 
+    Eigen::Vector6d twist_filter_saturation_  ; 
+                   
+};
+  
 bool CHECK_CLOCK(const ros::Time& what, const std::string& msg)
 {
   ros::Time act = ros::Time::now();
@@ -358,83 +371,6 @@ bool CHECK_CLOCK(const ros::Time& what, const std::string& msg)
   }
   return true;
 }
-
-/*
-class iiwaState
-{
-    bool            running_;
-
-    iiwa_msgs::JointPosition      q_msg_;
-    iiwa_msgs::JointVelocity      dq_msg_;
-    iiwa_msgs::JointTorque        tau_msg_;
-    geometry_msgs::WrenchStamped  wrench_;
-
-    Eigen::VectorXd q_;
-    Eigen::VectorXd dq_;
-    Eigen::VectorXd tau_;
-    Eigen::Affine3d pose_;
-    Eigen::VectorXd twist_;
-    Eigen::Vector3d vel_;
-    Eigen::Vector3d omega_;
-    Eigen::MatrixXd jacobian_;
-    Eigen::Vector3d f_ee_;
-    Eigen::Vector3d f_b_;
-    Eigen::Vector3d f0_;
-
-    Eigen::Vector3d tau_ee_;
-    Eigen::Vector3d tau_b_;
-    Eigen::Vector3d tau0_;
-
-    bool            first_q_;
-    bool            first_run_;
-    std::mutex      mtx_;
-
-    ros::Subscriber sub_joint_position;
-    ros::Subscriber sub_joint_velocity;
-    ros::Subscriber sub_joint_torque;
-    ros::Subscriber sub_cart_wrench;
-
-    KDL::Tree iiwa_tree_;
-    KDL::Chain iiwa_chain_;
-    std::shared_ptr< KDL::ChainFkSolverPos_recursive > fksolver_;
-    std::shared_ptr< KDL::ChainJntToJacSolver        > jacsolver_;
-
-    void iiwaStateJointPosition(const iiwa_msgs::JointPositionConstPtr& msg );
-    void iiwaStateJointVelocity(const iiwa_msgs::JointVelocityConstPtr& msg );
-    void iiwaStateJointTorque(const iiwa_msgs::JointTorqueConstPtr& msg );
-    void iiwaStateWrench(const geometry_msgs::WrenchStampedConstPtr& msg );
-
-  public:
-
-    Eigen::MatrixXd M,C,K;
-
-
-    iiwaState ( const std::string& robot_description
-              , const std::string &chain_root
-              , const std::string &chain_tip
-              , const Eigen::VectorXd& m, const Eigen::VectorXd& c, const Eigen::VectorXd& k );
-    ~iiwaState( );
-
-
-    bool getJointPosition(iiwa_msgs::JointPosition& jp);
-    bool getJointPosition(Eigen::VectorXd& q);
-    bool getCartesianPose( Eigen::Affine3d& cp);
-    bool getCartesianPoseVector(Eigen::VectorXd& x_msr);
-    bool getRotation( Eigen::Matrix3d& R  );
-    bool getQuaternion( Eigen::Quaterniond& quat );
-    bool getCartesianPoint( Eigen::Vector3d& point );
-    bool getWrench( Eigen::VectorXd& ret, const char what = 'e' );
-    bool getForce( Eigen::Vector3d& ret, const char what = 'e' );
-    bool getTorque( Eigen::Vector3d& ret, const char what = 'e' );
-    bool getTwist( Eigen::VectorXd&  ret );
-    bool getVelocity( Eigen::Vector3d& vel );
-    bool getOmega( Eigen::Vector3d& omega );
-    bool getMatrix( Eigen::Matrix3d& ret , const char what, const char translation );
-    bool toJointVelocity(const Eigen::Vector3d& velocity, const Eigen::Vector3d& omega, Eigen::VectorXd& ret);
-    bool toJointVelocity(const Eigen::VectorXd& q, const Eigen::Vector3d& velocity, const Eigen::Vector3d& omega, Eigen::VectorXd& ret);
-    bool isRunning() const;
-
-  };*/
 
 
 }

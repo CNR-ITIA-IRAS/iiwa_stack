@@ -35,6 +35,22 @@
 #include <eigen3/Eigen/QR>
 #include <stdio.h>
 
+#include <eigen3/Eigen/Core>
+#include <string>
+#include <mutex>
+
+#include <eigen_state_space_systems/eigen_common_filters.h>
+
+
+namespace Eigen
+{
+  typedef Matrix<double, 6,  1> Vector6d;
+  typedef Matrix<double, 6, -1> Matrix6Xd;
+  typedef Matrix<double, 6, 6> Matrix66d;
+}
+
+
+
 inline double timer_difference_s( struct timespec *timeA_p, struct timespec *timeB_p )
 {
     double ret = ( ( ( double ) ( timeA_p->tv_sec ) + ( (double) timeA_p->tv_nsec)/1.e9 )
@@ -74,6 +90,75 @@ inline double diff  ( const std::vector< double >& v1
   return *std::max_element( diff.begin(), diff.end() );
 }
 
+
+/**
+ * 
+ */
+struct Filter
+{
+  bool initialized_;
+  Eigen::VectorXd values_;
+  Eigen::VectorXd dead_band_;
+  Eigen::VectorXd saturation_; 
+  double filt_time_;
+  double sampling_time_;
+  std::vector < eigen_control_toolbox::FirstOrderLowPass *> lpf;
+
+  Filter( ) : initialized_(false ){ }
+
+  void init( const Eigen::VectorXd& dead_band, const Eigen::VectorXd& saturation, const double filt_time, const double sampling_time, const Eigen::VectorXd& init_value )
+  {
+    values_ = init_value;
+    dead_band_ = dead_band;
+    saturation_ = saturation;
+    filt_time_ = filt_time;
+    sampling_time_ = sampling_time;
+    initialized_ = true;
+    
+    double natural_frequency = (1/filt_time_) * 2 * M_PI ; // [rad/s]
+    
+    for(int i = 0; i < init_value.rows(); i++)
+    {
+      Eigen::VectorXd u(1); u.setZero();
+      lpf.push_back(new eigen_control_toolbox::FirstOrderLowPass( natural_frequency,sampling_time_));
+      lpf.back()->setStateFromIO(u,u);
+    }
+  
+   ROS_WARN_STREAM("Init Values: " << values_.transpose() );
+   ROS_WARN_STREAM("dead_band_: " << dead_band_.transpose() );
+   ROS_WARN_STREAM("saturation: " << saturation_.transpose() );
+   ROS_WARN_STREAM("filt_time_ : " << filt_time_ );
+   ROS_WARN_STREAM("initialized: " << initialized_ );
+    
+  }
+
+  const Eigen::VectorXd& update( const Eigen::VectorXd& new_values )
+  {
+    assert( values_.rows() == new_values.rows() );
+    
+    Eigen::VectorXd new_values_ = new_values;
+    for(int i = 0; i<new_values.size(); i++)
+    {
+      if(new_values[i] > dead_band_[i] )
+        new_values_[i] = new_values[i] - dead_band_[i];
+      else if (new_values[i] < -dead_band_[i] )
+        new_values_[i] = new_values[i] + dead_band_[i];
+      else 
+        new_values_[i] = 0;
+      
+      if(new_values[i] > saturation_[i] )
+        new_values_[i] = saturation_[i];
+      else if (new_values[i] < -saturation_[i] )
+        new_values_[i] = -saturation_[i];
+      
+      values_[i] = lpf[i]->update(new_values_[i]);
+    }
+
+    return values_;
+  }
+};
+
+
 namespace iiwa_ros 
 {
 class LBRJointOverlayClient : public KUKA::FRI::LBRClient
@@ -89,7 +174,11 @@ private:
     LBRJointOverlayClient ( const std::string& robot_description
                           , const std::string& chain_root
                           , const std::string& chain_tip
-                          , const size_t target_queue_lenght = 1e8 );
+                          , const double wrench_filter_frequency
+                          , const Eigen::Vector6d& wrench_filter_deadband
+                          , const double twist_filter_frequency
+                          , const Eigen::Vector6d& twsit_filter_deadband
+                          , const size_t target_queue_lenght = 1e2 );
     ~LBRJointOverlayClient( );
     
     virtual void onStateChange(KUKA::FRI::ESessionState oldState, KUKA::FRI::ESessionState newState);
@@ -147,6 +236,9 @@ private:
     KDL::Chain iiwa_chain_;
     std::shared_ptr< KDL::ChainFkSolverPos_recursive > fksolver_;
     std::shared_ptr< KDL::ChainJntToJacSolver        > jacsolver_;
+    
+    Filter  wrench_filter_;
+    Filter  twist_filter_;
 
 };
 

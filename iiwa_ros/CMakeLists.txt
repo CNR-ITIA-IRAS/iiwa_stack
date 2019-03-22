@@ -18,10 +18,16 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   realtime_utilities
   realtime_tools
+  kdl_parser
+  eigen_conversions
+  kdl_conversions
+  eigen_state_space_systems
 )
 
 find_package(Boost REQUIRED system filesystem date_time thread )
 find_package(Eigen3)
+
+find_package( orocos_kdl )
 
 catkin_package(
   INCLUDE_DIRS include
@@ -47,3 +53,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 ## Add dependence to the iiwa_msg module for the library
 add_dependencies(${PROJECT_NAME} iiwa_msgs_generate_messages_cpp)
+
+
+add_executable(test_fri src/test_fri.cpp)
+target_link_libraries(test_fri ${PROJECT_NAME} orocos-kdl ${KUKA_FRI_LIBRARIES} ${catkin_LIBRARIES} ${EIGEN3_LIBRARIES} ${Boost_LIBRARIES})

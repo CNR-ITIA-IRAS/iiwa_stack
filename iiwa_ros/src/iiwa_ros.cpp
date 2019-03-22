@@ -28,19 +28,26 @@
 #include <iiwa_msgs/ControlMode.h>
 #include <iiwa_ros/iiwa_ros.h>
 #include <eigen_conversions/eigen_msg.h>
+#include <Eigen/Geometry>
+#include <Eigen/StdVector>
 
 using namespace std;
 
 namespace iiwa_ros
 {
-
+  
 ros::Time last_update_time;
 
 iiwaRos::iiwaRos() { }
 
-void iiwaRos::init(double fri_cycle_time, const bool verbosity)
+void iiwaRos::init (double fri_cycle_time
+                    , const double wrench_filter_frequency
+                    , const Eigen::Vector6d& wrench_filter_deadband
+                    , const double twist_filter_frequency
+                    , const Eigen::Vector6d& twist_filter_deadband
+                    , const bool verbosity)
 {
-  dt_ = fri_cycle_time;
+    dt_ = fri_cycle_time;
     holder_state_pose_.init ( "state/CartesianPose" );
     holder_state_joint_position_.init ( "state/JointPosition" );
     holder_state_joint_torque_.init ( "state/JointTorque" );
@@ -64,6 +71,13 @@ void iiwaRos::init(double fri_cycle_time, const bool verbosity)
     servo_motion_service_.setVerbosity(verbosity);
     path_parameters_service_.setVerbosity(verbosity);
     time_to_destination_service_.setVerbosity(verbosity);
+    
+    wrench_filter_saturation_ << 200, 200, 200, 200, 200, 200;
+    wrench_filter_deadband_ = wrench_filter_deadband; 
+    wrench_filter_saturation_ =  1./wrench_filter_frequency_;
+    
+    Eigen::Vector6d twist_filter_saturation;  twist_filter_saturation << 2,2,2,2,2,2;
+    twist_filter_. init( twist_filter_deadband, twist_filter_saturation, 1./twist_filter_frequency, fri_cycle_time, Eigen::Vector6d::Zero()  );
 }
 
 bool iiwaRos::getRobotIsConnected()
@@ -78,9 +92,8 @@ bool iiwaRos::isFRIModalityActive()
                               || ( control_modality_active == iiwa_msgs::ControlMode::FRI_TORQUE_CONTROL    )
                               || ( control_modality_active == iiwa_msgs::ControlMode::FRI_JOINT_IMP_CONTROL );
 
-  return fri_modality_active
-      && servo_motion_service_.getFRIApp( ) != nullptr
-      && servo_motion_service_.getFRIApp( )->isActive();
+  return fri_modality_active 
+      ||( servo_motion_service_.getFRIApp( ) != nullptr && servo_motion_service_.getFRIApp( )->isActive() );
 
 }
 
@@ -119,55 +132,117 @@ bool iiwaRos::getJointStiffness ( iiwa_msgs::JointStiffness& value )
     return holder_state_joint_stiffness_.get ( value );
 }
 
-bool iiwaRos::getCartesianWrench (geometry_msgs::WrenchStamped& value , const char what, const bool compensate_payload)
+bool iiwaRos::getCartesianWrench (geometry_msgs::WrenchStamped& value, const char what, const bool filtered, const bool compensate_payload )
 {
   bool ret = true;
   
+  geometry_msgs::WrenchStamped raw_value_b;
+  Eigen::VectorXd              raw_wrench_b = Eigen::VectorXd(6).setZero();
+  Eigen::VectorXd              filtered_wrench_b = Eigen::VectorXd(6).setZero();
   if( !isFRIModalityActive() )
   {
-    ret = holder_state_wrench_.get ( value );
+    ret = holder_state_wrench_.get ( raw_value_b );
   }
   else
   {
-    ret =  servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianWrench (value, what);
+    ret =  servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianWrench (raw_value_b, 'b');
   }
   
   if(!ret)
     return false;
   
+  raw_wrench_b(0) = raw_value_b.wrench.force.x;
+  raw_wrench_b(1) = raw_value_b.wrench.force.y;
+  raw_wrench_b(2) = raw_value_b.wrench.force.z;
+  raw_wrench_b(3) = raw_value_b.wrench.torque.x;
+  raw_wrench_b(4) = raw_value_b.wrench.torque.y;
+  raw_wrench_b(5) = raw_value_b.wrench.torque.z;
+  
+  
+  filtered_wrench_b = wrench_filter_.update( raw_wrench_b );
+  
+  Eigen::VectorXd wrench_ret(6); wrench_ret.setZero();
   if (compensate_payload && payload.initializated)
   {
-    geometry_msgs::PoseStamped pose_msg;
-    getCartesianPose(pose_msg);
+    Eigen::VectorXd wrench_b =  filtered ? filtered_wrench_b : raw_wrench_b;
     
+    geometry_msgs::PoseStamped pose_msg;
+    while(! getCartesianPose(pose_msg) )
+    {
+      ROS_ERROR("Waiting for a good cart position");
+      ros::Duration(0.05).sleep();
+    }
+      
     Eigen::Affine3d pose;
     tf::poseMsgToEigen(pose_msg.pose, pose);
     
-    Eigen::Matrix<double,6,1> wrench;
-    tf::wrenchMsgToEigen(value.wrench,wrench);
-    
-    Eigen::Vector3d gravity_b; gravity_b << 0,0,-9.81;
-    Eigen::Vector3d gravity_e = pose.linear().transpose() * gravity_b;
-    
-    Eigen::VectorXd wrench_ret(6);
-    
-    if(what == 'b')
+    if(payload.compensation_method == Payload::PAYLOAD_ESTIMATION )
     {
-      wrench_ret.block(0,0,3,1) = wrench.block(0,0,3,1) - payload.mass * gravity_b;
-      wrench_ret.block(3,0,3,1) = wrench.block(3,0,3,1) - pose.linear() * (payload.mass * payload.distance.cross(gravity_e));
+    
+      Eigen::Vector3d gravity_b; gravity_b << 0,0,-9.81;
+      Eigen::Vector3d gravity_e = pose.linear().transpose() * gravity_b;
+      
+      if(what == 'b')
+      {
+        wrench_ret.block(0,0,3,1) = wrench_b.block(0,0,3,1) - payload.mass * gravity_b;
+        wrench_ret.block(3,0,3,1) = wrench_b.block(3,0,3,1) - pose.linear() * (payload.mass * payload.distance.cross(gravity_e));
+      }
+      else
+      {
+        wrench_ret.block(0,0,3,1) = pose.linear().transpose() * wrench_b.block(0,0,3,1) - payload.mass * gravity_e;
+        wrench_ret.block(3,0,3,1) = pose.linear().transpose() * wrench_b.block(3,0,3,1) - payload.mass * payload.distance.cross(gravity_e);
+      }
     }
     else
     {
-      wrench_ret.block(0,0,3,1) = wrench.block(0,0,3,1) - payload.mass * gravity_e;
-      wrench_ret.block(3,0,3,1) = wrench.block(3,0,3,1) - payload.mass * payload.distance.cross(gravity_e);
+      if(what == 'b')
+      {
+        wrench_ret = wrench_b - payload.wrench_offset_b;
+      }
+      else
+      {
+        wrench_ret.block(0,0,3,1) = pose.linear().transpose() * ( wrench_b.block(0,0,3,1) - payload.wrench_offset_b.block(0,0,3,1) );
+        wrench_ret.block(3,0,3,1) = pose.linear().transpose() * ( wrench_b.block(3,0,3,1) - payload.wrench_offset_b.block(3,0,3,1) );
+      }
     }
     
-    tf::wrenchEigenToMsg(wrench_ret,value.wrench);
-    
-    return true;
   }
+  else
+  {
+      wrench_ret = filtered ? filtered_wrench_b : raw_wrench_b;
+  }
+  std::cout << wrench_ret.transpose() << std::endl;
   
+  value.header.stamp = ros::Time::now();
+  tf::wrenchEigenToMsg(wrench_ret,value.wrench);
+  return true;
+}
+
+
+bool iiwaRos::getCartesianTwist( geometry_msgs::TwistStamped value, const char what, const bool filtered  )
+{
+  Eigen::MatrixXd j;
+  Eigen::VectorXd dq;
+  iiwa_msgs::JointVelocity jv;  
   
+  getJacobian     ( j  );
+  getJointVelocity( jv ); iiwaJointVelocityToEigenVector( jv, dq );
+  
+  Eigen::VectorXd raw_twist = j * dq;
+  Eigen::VectorXd filtered_twist = wrench_filter_.update( raw_twist );
+  
+  Eigen::VectorXd twist = filtered ? filtered_twist : raw_twist;
+  if( what !='b' )
+  {
+    Eigen::Affine3d pose;
+    geometry_msgs::PoseStamped cp;
+    getCartesianPose( cp );
+    tf::poseMsgToEigen( cp.pose, pose );
+    twist.block(0,0,3,1) = pose.linear().transpose() * twist.block(0,0,3,1);
+    twist.block(3,0,3,1) = pose.linear().transpose() * twist.block(3,0,3,1);
+  }
+  value.header.stamp = ros::Time::now();
+  tf::twistEigenToMsg(twist, value.twist);
   return true;
 }
 
@@ -346,6 +421,7 @@ bool iiwaRos::estimatePayload(const double estimation_time, const double toll)
   Eigen::Affine3d              pose;
   Eigen::Vector3d              torque; torque.setZero();
   
+  payload.compensation_method = Payload::PAYLOAD_ESTIMATION;
   
   ROS_INFO("Get Pose");
   if(!getCartesianPose(pose_msg))
@@ -363,7 +439,7 @@ bool iiwaRos::estimatePayload(const double estimation_time, const double toll)
   while((ros::Time::now() - st).toSec() < estimation_time)
   {
     count ++;
-    if(!getCartesianWrench(wrench_msg,'e', false))
+    if(!getCartesianWrench(wrench_msg,'e', true, false))
     {
       ROS_ERROR("Problem in getCartesianWrench");
       return false;
@@ -409,6 +485,54 @@ bool iiwaRos::estimatePayload(const double estimation_time, const double toll)
   payload.initializated = true;
   return true;
 }
+
+
+bool iiwaRos::setWrenchOffset(const double estimation_time)
+{
+  ROS_INFO("Estimation of the payload (no movement foreseen");
+  ros::Time st = ros::Time::now();
+  
+  geometry_msgs::WrenchStamped wrench_msg;
+  geometry_msgs::PoseStamped   pose_msg;
+  Eigen::VectorXd              wrench(6); wrench.setZero();
+
+  
+  payload.compensation_method = Payload::OFFSET_ESTIMATION;
+  
+  int count = 0;
+  ros::Rate r(50);
+  
+  while((ros::Time::now() - st).toSec() < estimation_time)
+  {
+    count++;
+    if(!getCartesianWrench(wrench_msg,'b', false, false ))
+    {
+      ROS_ERROR("Problem in getCartesianWrench");
+      return false;
+    }
+    
+    Eigen::Matrix<double,6,1> wrench_tmp;
+    tf::wrenchMsgToEigen(wrench_msg.wrench,wrench_tmp);
+    
+    wrench += wrench_tmp;
+    r.sleep();
+  }
+  wrench /= (double) count;
+  payload.wrench_offset_b = wrench;
+  
+  
+  ROS_INFO_STREAM("Estimation finished: "  << payload.wrench_offset_b.transpose() );
+  geometry_msgs::WrenchStamped value;
+  getCartesianWrench (value, 'b', true, true );
+  std::cout << value.wrench <<std::endl;
+  getCartesianWrench (value, 'b', false, true );
+  std::cout << value.wrench <<std::endl;
+  getCartesianWrench (value, 'b', false, false );
+  std::cout << value.wrench <<std::endl;
+  payload.initializated = true;
+  return true;
+}
+  
   
 void iiwaRos::setJointPositionVelocity ( const iiwa_msgs::JointPositionVelocity& value )
 {

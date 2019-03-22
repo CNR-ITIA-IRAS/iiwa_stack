@@ -70,7 +70,7 @@ LBRJointOverlayClient::LBRJointOverlayClient( const std::string& robot_descripti
   fksolver_.reset( new KDL::ChainFkSolverPos_recursive( iiwa_chain_ ) );
   jacsolver_.reset( new KDL::ChainJntToJacSolver( iiwa_chain_ ) );
 
-  // logger = std::thread( &LBRJointOverlayClient::loggerThread, this);
+  logger = std::thread( &LBRJointOverlayClient::loggerThread, this);
 }
 
 LBRJointOverlayClient::~LBRJointOverlayClient( ) { }
