@@ -1,0 +1,380 @@
+control_configurations:
+  - name: "fake"
+    components: 
+      - description: ""
+        hardware_interface: "iiwa_fake"
+        controller        : "thor_prefilter_planner"
+      - description: ""
+        hardware_interface: "iiwa_fake"
+        controller        : "js_pub"
+
+  - name: "watch"
+    components: 
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "js_pub"
+
+  - name: "test_vel"
+    components: 
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "js_pub"
+      - description: ""
+        hardware_interface: "planner_hi"
+        controller        : "fir_planner"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "linkpos_to_vel_jnt7_1"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "linkpos_to_vel_jnt6_1"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "linkpos_to_vel_jnt5_1"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "linkpos_to_vel_jnt4_1"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "linkpos_to_vel_jnt3_1"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "linkpos_to_vel_jnt2_1"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "linkpos_to_vel_jnt1_1"
+
+  - name: "cart_teleop"
+    components: 
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "js_pub"
+      - description: ""
+        hardware_interface: "cart_fir_planner"
+        controller        : "fir_planner"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "linkpos_to_vel_jnt7_1"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "linkpos_to_vel_jnt6_1"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "linkpos_to_vel_jnt5_1"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "linkpos_to_vel_jnt4_1"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "linkpos_to_vel_jnt3_1"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "linkpos_to_vel_jnt2_1"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "linkpos_to_vel_jnt1_1"
+
+  - name: "posvel"
+    components: 
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "js_pub"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "fir_planner"
+
+  - name: "pos"
+    components: 
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "js_pub"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "pos_fir_planner"
+
+  - name: "thor_prefilter_planner"
+    components: 
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "thor_prefilter_planner"
+
+
+iiwa:
+  type: "itia/control/IiwaHwIfaceNodelet"
+
+  fir_port: 30200
+  fir_remote_address: 192.170.1.147
+  fir_adapter_address: 192.170.1.105
+  defaultMinimumTrjectoryExecution: 10.e-3
+  publishJointStates: true
+  defaultRelativeJointSpeed: 1.0
+  defaultRelativeJointAcceleration: 1.0
+
+  joint_names: 
+  - iiwa_joint_1  
+  - iiwa_joint_2
+  - iiwa_joint_3
+  - iiwa_joint_4
+  - iiwa_joint_5
+  - iiwa_joint_6
+  - iiwa_joint_7
+  allowed_controller_types: 
+  - "controller_type1"  
+  
+  sampling_period: 0.008
+  diagnostic_period: 0.1
+  feedback_joint_state_timeout: 20
+  maximum_missing_messages: 1000
+
+  remap_source_args:
+  - "/iiwa/fir_planner/follow_joint_trajectory/cancel"
+  - "/iiwa/fir_planner/follow_joint_trajectory/feedback"
+  - "/iiwa/fir_planner/follow_joint_trajectory/goal"
+  - "/iiwa/fir_planner/follow_joint_trajectory/result"
+  - "/iiwa/fir_planner/follow_joint_trajectory/status"
+  - "/iiwa/thor_prefilter_planner/follow_joint_trajectory/cancel"
+  - "/iiwa/thor_prefilter_planner/follow_joint_trajectory/feedback"
+  - "/iiwa/thor_prefilter_planner/follow_joint_trajectory/goal"
+  - "/iiwa/thor_prefilter_planner/follow_joint_trajectory/result"
+  - "/iiwa/thor_prefilter_planner/follow_joint_trajectory/status"
+  #- "/iiwa/joint_states"
+  remap_target_args: 
+  - "/follow_joint_trajectory/cancel"
+  - "/follow_joint_trajectory/feedback"
+  - "/follow_joint_trajectory/goal"
+  - "/follow_joint_trajectory/result"
+  - "/follow_joint_trajectory/status"
+  - "/follow_joint_trajectory/cancel"
+  - "/follow_joint_trajectory/feedback"
+  - "/follow_joint_trajectory/goal"
+  - "/follow_joint_trajectory/result"
+  - "/follow_joint_trajectory/status"
+  #- "/iiwa/joint_states_2"
+
+  thor_prefilter_planner:
+    type: "thor/PrefilterPosVelEffController"
+    controlled_joint:
+    - iiwa_joint_1
+    - iiwa_joint_2
+    - iiwa_joint_3
+    - iiwa_joint_4
+    - iiwa_joint_5
+    - iiwa_joint_6
+    - iiwa_joint_7
+    spline_order: 1
+
+  pos_fir_planner:
+    type: "itia/motion/OnlyPosFirController"
+    controlled_joint:
+    - iiwa_joint_1
+    - iiwa_joint_2
+    - iiwa_joint_3
+    - iiwa_joint_4
+    - iiwa_joint_5
+    - iiwa_joint_6
+    - iiwa_joint_7
+    
+    fir_params:
+      sample_period: 0.008
+      cruise_jnt_vel: [1.4835298642, 1.4835298642, 1.745329252, 1.308996939, 2.2689280276, 2.3561944902, 2.3561944902]
+      acc_vel_ratio: 2.0   # acc/vel
+      default_path_accuracy: 0.01
+      default_goal_accuracy: 0
+      np: 2  
+      stop_when_zero_override: true
+
+      
+  thor_prefilter_planner:
+    type: "thor/PrefilterPosController"
+    controlled_joint:
+    - iiwa_joint_1
+    - iiwa_joint_2
+    - iiwa_joint_3
+    - iiwa_joint_4
+    - iiwa_joint_5
+    - iiwa_joint_6
+    - iiwa_joint_7
+    spline_order: 1
+
+
+      
+      
+      
+      
+      
+  fir_planner:
+    type: "itia/motion/FirController"
+    controlled_joint:
+    - iiwa_joint_1
+    - iiwa_joint_2
+    - iiwa_joint_3
+    - iiwa_joint_4
+    - iiwa_joint_5
+    - iiwa_joint_6
+    - iiwa_joint_7
+    
+    fir_params:
+      sample_period: 0.008
+      cruise_jnt_vel: [1.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5] ##### USARE IL POS FIR PLANNER
+      acc_vel_ratio: 2.0   # acc/vel
+      default_path_accuracy: 0.1
+      default_goal_accuracy: 0
+      np: 2  
+      stop_when_zero_override: true
+  
+      
+  cart_fir_planner:
+    type: "itia/motion/FirController"
+    controlled_joint:
+    - iiwa_joint_1
+    - iiwa_joint_2
+    - iiwa_joint_3
+    - iiwa_joint_4
+    - iiwa_joint_5
+    - iiwa_joint_6
+    - iiwa_joint_7
+
+    
+    cartesian_teleop: true
+    message_timeout: 0.033 # considera solo messaggi pubblicati al massimo 0.033 secondi fa
+    base_frame: "iiwa_link_0" 
+    # metti il tool corretto
+    tool_frame:  "iiwa_link_ee"
+    setpoint_topic_name: "/cart_teleop"
+    
+    fir_params:
+      sample_period: 0.01
+      cruise_jnt_vel: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+      acc_vel_ratio: 0.75   # acc/vel
+      default_path_accuracy: 0.1
+      default_goal_accuracy: 0
+      np: 2  
+      stop_when_zero_override: true
+
+  js_pub:
+    type:         joint_state_controller/JointStateController
+    publish_rate: 125
+
+#zeros:
+#  shoulder_lift_joint: -1.5708
+
+
+
+
+
+      
+planner_hi:
+  type: "itia/control/TopicHwIfaceNodelet"
+  joint_names: 
+  - iiwa_joint_1
+  - iiwa_joint_2
+  - iiwa_joint_3
+  - iiwa_joint_4
+  - iiwa_joint_5
+  - iiwa_joint_6
+  - iiwa_joint_7
+  allowed_controller_types: 
+  - "controller_type1"  
+  feedback_joint_state_topic: "/iiwa/joint_states"
+  command_joint_state_topic: "/joint_pos_target"
+  sampling_period: 0.01
+  diagnostic_period: 0.1
+  feedback_joint_state_timeout: 20
+
+  remap_source_args:
+  - "/planner_hi/fir_planner/follow_joint_trajectory/cancel"
+  - "/planner_hi/fir_planner/follow_joint_trajectory/feedback"
+  - "/planner_hi/fir_planner/follow_joint_trajectory/goal"
+  - "/planner_hi/fir_planner/follow_joint_trajectory/result"
+  - "/planner_hi/fir_planner/follow_joint_trajectory/status"
+  remap_target_args: 
+  - "/iiwa/VelocityJointInterface_trajectory_controller/follow_joint_trajectory/cancel"
+  - "/iiwa/VelocityJointInterface_trajectory_controller/follow_joint_trajectory/feedback"
+  - "/iiwa/VelocityJointInterface_trajectory_controller/follow_joint_trajectory/goal"
+  - "/iiwa/VelocityJointInterface_trajectory_controller/follow_joint_trajectory/result"
+  - "/iiwa/VelocityJointInterface_trajectory_controller/follow_joint_trajectory/status"
+
+  fir_planner:
+    type: "itia/motion/FirController"
+    controlled_joint:
+    - iiwa_joint_1
+    - iiwa_joint_2
+    - iiwa_joint_3
+    - iiwa_joint_4
+    - iiwa_joint_5
+    - iiwa_joint_6
+    - iiwa_joint_7
+    
+    fir_params:
+      sample_period: 0.01
+      cruise_jnt_vel: [1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5]
+      use_time: true
+      acc_vel_ratio: 0.5 # acc/vel
+      default_path_accuracy: 0.1
+      default_goal_accuracy: 0
+      np: 2  
+      stop_when_zero_override: true
+
+zeros:
+  iiwa_joint_1: -1.45793759823
+  iiwa_joint_2: 0.520298779011
+  iiwa_joint_3: 0.0
+  iiwa_joint_4: -1.0
+  iiwa_joint_5: 0.0
+  iiwa_joint_6: 1.59
+  iiwa_joint_7: 0
+
+  
+  
+  
+iiwa_fake:
+  type: "itia/control/FakeHwIfaceNodelet"
+  joint_names: 
+  - iiwa_joint_1
+  - iiwa_joint_2
+  - iiwa_joint_3
+  - iiwa_joint_4
+  - iiwa_joint_5
+  - iiwa_joint_6
+  - iiwa_joint_7
+  allowed_controller_types: 
+  - "controller_type1"  
+  feedback_joint_state_topic: "/joint_states"
+  command_joint_state_topic: "/joint_pos_target"
+  sampling_period: 0.008
+  diagnostic_period: 0.1
+  feedback_joint_state_timeout: 20
+  
+  initial_position: [0.0, 1.0, 1.5708, 1.0, 1.0, 1.5708, 0.0]
+  remap_source_args:
+  - "/iiwa_fake/thor_prefilter_planner/follow_joint_trajectory/cancel"
+  - "/iiwa_fake/thor_prefilter_planner/follow_joint_trajectory/feedback"
+  - "/iiwa_fake/thor_prefilter_planner/follow_joint_trajectory/goal"
+  - "/iiwa_fake/thor_prefilter_planner/follow_joint_trajectory/result"
+  - "/iiwa_fake/thor_prefilter_planner/follow_joint_trajectory/status"
+  - "/iiwa_fake/joint_states"
+  remap_target_args: 
+  - "/iiwa/VelocityJointInterface_trajectory_controller/follow_joint_trajectory/cancel"
+  - "/iiwa/VelocityJointInterface_trajectory_controller/follow_joint_trajectory/feedback"
+  - "/iiwa/VelocityJointInterface_trajectory_controller/follow_joint_trajectory/goal"
+  - "/iiwa/VelocityJointInterface_trajectory_controller/follow_joint_trajectory/result"
+  - "/iiwa/VelocityJointInterface_trajectory_controller/follow_joint_trajectory/status"
+  - "/iiwa/joint_states"  
+  
+  js_pub:
+    type:         joint_state_controller/JointStateController
+    publish_rate: 1000
+    
+  thor_prefilter_planner:
+    type: "thor/PrefilterPosVelEffController"
+    controlled_joint:
+    - iiwa_joint_1
+    - iiwa_joint_2
+    - iiwa_joint_3
+    - iiwa_joint_4
+    - iiwa_joint_5
+    - iiwa_joint_6
+    - iiwa_joint_7
+    spline_order: 1
+
+

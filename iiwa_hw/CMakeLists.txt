@@ -13,6 +13,7 @@ if( ENABLE_FRI )
 endif()
 
 find_package(catkin REQUIRED COMPONENTS
+  itia_basic_hardware_interface
   control_toolbox
   controller_interface
   controller_manager

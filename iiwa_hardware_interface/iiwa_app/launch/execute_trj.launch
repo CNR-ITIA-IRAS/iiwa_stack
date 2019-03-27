@@ -1,0 +1,21 @@
+<launch>
+  <arg name="trj" default="home" /> 
+  <arg name="log_name" default="trj"/> 
+  <arg name="rep" default="1"/> 
+  <param name="/binary_logger/test_name" type="string" value="$(arg log_name)" />
+  <param name="/log_repetition" type="int" value="$(arg rep)" />
+  <rosparam file="$(find iiwa_app)/config/predefined_position.yaml" command="load"/>
+  
+  <node pkg="itia_tutils" type="trajectory_client" name="hand_trajectory_client" output="screen">
+    <remap from="/trajectory/positions"       to="/$(arg trj)/positions"/>
+    <remap from="/trajectory/velocities"      to="/$(arg trj)/velocities"/>
+    <remap from="/trajectory/time_from_start" to="/$(arg trj)/time_from_start"/>
+    <remap from="/trajectory/joint_names"     to="/$(arg trj)/joint_names"/>
+    <remap from="follow_joint_trajectory/cancel" to="/iiwa/VelocityJointInterface_trajectory_controller/follow_joint_trajectory/cancel"/>
+    <remap from="follow_joint_trajectory/feedback" to="/iiwa/VelocityJointInterface_trajectory_controller/follow_joint_trajectory/feedback"/>
+    <remap from="follow_joint_trajectory/goal" to="/iiwa/VelocityJointInterface_trajectory_controller/follow_joint_trajectory/goal"/>
+    <remap from="follow_joint_trajectory/result" to="/iiwa/VelocityJointInterface_trajectory_controller/follow_joint_trajectory/result"/>
+    <remap from="follow_joint_trajectory/status" to="/iiwa/VelocityJointInterface_trajectory_controller/follow_joint_trajectory/status"/>
+
+  </node>
+</launch>

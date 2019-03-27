@@ -40,8 +40,7 @@ ros::Time last_update_time;
 
 iiwaRos::iiwaRos() { }
 
-void iiwaRos::init (double fri_cycle_time
-                    , const bool verbosity)
+void iiwaRos::init (double fri_cycle_time, const bool verbosity)
 {
     dt_ = fri_cycle_time;
     holder_state_pose_.init ( "state/CartesianPose" );
@@ -72,11 +71,8 @@ void iiwaRos::init (double fri_cycle_time
 
 }
 
-
-
 void iiwaRos::friPublisherThread()
 #define CATCH_ERROR(X) if(!X){ROS_ERROR_THROTTLE(10,"%s failed", #X);}
-
 {
   ros::NodeHandle nh("~");
 
@@ -156,7 +152,7 @@ void iiwaRos::friPublisherThread()
 
     rt.sleep();
   }
-
+#undef CATCH_ERROR
 }
 
 void iiwaRos::startFriPublisher()
@@ -181,6 +177,7 @@ bool iiwaRos::getRobotIsConnected()
     ros::Duration diff = ( ros::Time::now() - last_update_time );
     return ( diff < ros::Duration ( 0.25 ) );
 }
+
 bool iiwaRos::isFRIModalityActive()
 {
   int control_modality_active = servo_motion_service_.getControlModeActive();
@@ -193,20 +190,28 @@ bool iiwaRos::isFRIModalityActive()
 
 }
 
-bool iiwaRos::getCartesianPose ( geometry_msgs::PoseStamped& value )
-{
-    if( !isFRIModalityActive() )
-      return holder_state_pose_.get ( value );
-    else
-    {
-      return servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianPose(value);
-    }
-}
-
 bool iiwaRos::getJointPosition ( iiwa_msgs::JointPosition& value )
 {
   if( !isFRIModalityActive() )
+  {
     return holder_state_joint_position_.get ( value );
+  }
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().getJointPosition(value);
+  }
+}
+
+bool iiwaRos::getJointPosition( Eigen::Vector7d& value )
+{
+  if( !isFRIModalityActive() )
+  {
+    iiwa_msgs::JointPosition jp;
+    if(!holder_state_joint_position_.get ( jp ) )
+      return false;
+    iiwa_ros::iiwaJointPositionToEigenVector(jp,value);
+    return true;
+  }
   else
   {
     return servo_motion_service_.getFRIApp( )->getFRIClient().getJointPosition(value);
@@ -223,16 +228,78 @@ bool iiwaRos::getJointTorque ( iiwa_msgs::JointTorque& value )
   }
 }
 
-bool iiwaRos::getJointStiffness ( iiwa_msgs::JointStiffness& value )
+bool iiwaRos::getJointTorque ( Eigen::Vector7d& value )
 {
-    return holder_state_joint_stiffness_.get ( value );
+  if( !isFRIModalityActive() )
+  {
+    iiwa_msgs::JointTorque jt;
+    if(!holder_state_joint_torque_.get ( jt ) )
+      return false;
+    iiwa_ros::iiwaJointTorqueToEigenVector(jt,value);
+    return true;
+  }
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().getJointTorque(value);
+  }
 }
 
-bool iiwaRos::getCartesianWrench (geometry_msgs::WrenchStamped& value, const char what, const bool filtered, const bool compensate_payload )
+bool iiwaRos::getJointVelocity ( iiwa_msgs::JointVelocity& value )
 {
+  if( !isFRIModalityActive() )
+    return holder_state_joint_velocity_.get ( value );
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().getJointVelocity (value);
+  }
+}
+
+bool iiwaRos::getJointVelocity ( Eigen::Vector7d& value )
+{
+  if( !isFRIModalityActive() )
+  {
+    iiwa_msgs::JointVelocity jv;
+    if(!holder_state_joint_velocity_.get ( jv ) )
+      return false;
+    iiwa_ros::iiwaJointVelocityToEigenVector(jv,value);
+    return true;
+  }
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().getJointVelocity (value);
+  }
+}
+
+bool iiwaRos::getCartesianPose( geometry_msgs::PoseStamped& value ) {
+  if( !isFRIModalityActive() )
+  {
+    ROS_ERROR_THROTTLE(5,"Not yet supported");
+    return false;
+  }
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianPose(value);
+  }
+  return true;
+}
+
+bool iiwaRos::getCartesianPose( Eigen::Affine3d& value ) {
+  if( !isFRIModalityActive() )
+  {
+    ROS_ERROR_THROTTLE(5,"Not yet supported");
+    return false;
+  }
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianPose(value);
+  }
+  return true;
+}
+
+bool iiwaRos::getCartesianWrench (geometry_msgs::WrenchStamped& value, const char what, const bool filtered, const bool compensate_payload ) {
   bool ret = true;
-  
-  Eigen::VectorXd              wrench = Eigen::VectorXd(6).setZero();
+
+  Eigen::Vector6d  wrench = Eigen::Vector6d::Zero();
   if( !isFRIModalityActive() )
   {
     ret = holder_state_wrench_.get ( value );
@@ -241,37 +308,37 @@ bool iiwaRos::getCartesianWrench (geometry_msgs::WrenchStamped& value, const cha
   {
     ret = servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianWrench (value, what, filtered);
   }
-  
+
   if(!ret)
     return false;
-  
+
   wrench(0) = value.wrench.force.x;
   wrench(1) = value.wrench.force.y;
   wrench(2) = value.wrench.force.z;
   wrench(3) = value.wrench.torque.x;
   wrench(4) = value.wrench.torque.y;
   wrench(5) = value.wrench.torque.z;
-  
-  Eigen::VectorXd wrench_ret(6); wrench_ret.setZero();
+
+  Eigen::Vector6d wrench_ret = Eigen::Vector6d::Zero();
   if (compensate_payload && payload.initializated)
   {
-    
+
     geometry_msgs::PoseStamped pose_msg;
     while(! getCartesianPose(pose_msg) )
     {
       ROS_ERROR("Waiting for a good cart position");
       ros::Duration(0.05).sleep();
     }
-      
+
     Eigen::Affine3d pose;
     tf::poseMsgToEigen(pose_msg.pose, pose);
-    
+
     if(payload.compensation_method == Payload::PAYLOAD_ESTIMATION )
     {
-    
+
       Eigen::Vector3d gravity_b; gravity_b << 0,0,-9.81;
       Eigen::Vector3d gravity_e = pose.linear().transpose() * gravity_b;
-      
+
       if(what == 'b')
       { // "wrench" is in base frame
         wrench_ret.block(0,0,3,1) = wrench.block(0,0,3,1) - payload.mass * gravity_b;
@@ -306,6 +373,15 @@ bool iiwaRos::getCartesianWrench (geometry_msgs::WrenchStamped& value, const cha
   return true;
 }
 
+bool iiwaRos::getCartesianWrench (Eigen::Vector6d& value, const char what, const bool filtered, const bool compensate_payload ) {
+  geometry_msgs::WrenchStamped wrench;
+  if(!getCartesianWrench (wrench, what, filtered, compensate_payload ) )
+  {
+    return false;
+  }
+  tf::wrenchMsgToEigen(wrench.wrench,value);
+  return true;
+}
 
 bool iiwaRos::getCartesianTwist( geometry_msgs::TwistStamped& value, const char what, const bool filtered  )
 {
@@ -321,7 +397,180 @@ bool iiwaRos::getCartesianTwist( geometry_msgs::TwistStamped& value, const char 
   return true;
 }
 
-bool iiwaRos::getJacobian(Eigen::MatrixXd& value)
+bool iiwaRos::getCartesianTwist( Eigen::Vector6d& value, const char what, const bool filtered  )
+{
+  if( !isFRIModalityActive() )
+  {
+    ROS_ERROR_THROTTLE(5,"Not yet supported");
+    return false;
+  }
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianTwist(value, what, filtered);
+  }
+  return true;
+}
+
+
+bool iiwaRos::getCartesianRotation   ( Eigen::Matrix3d&    R     )
+{
+  if( !isFRIModalityActive() )
+  {
+    ROS_ERROR_THROTTLE(5,"Not yet supported");
+    return false;
+  }
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianRotation(R);
+  }
+  return true;
+}
+bool iiwaRos::getCartesianQuaternion ( Eigen::Quaterniond& quat  )
+{
+  if( !isFRIModalityActive() )
+  {
+    ROS_ERROR_THROTTLE(5,"Not yet supported");
+    return false;
+  }
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianQuaternion(quat);
+  }
+  return true;
+}
+
+bool iiwaRos::getCartesianPoint      ( Eigen::Vector3d&    point )
+{
+  if( !isFRIModalityActive() )
+  {
+    ROS_ERROR_THROTTLE(5,"Not yet supported");
+    return false;
+  }
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianPoint(point);
+  }
+  return true;
+}
+bool iiwaRos::getCartesianForce ( Eigen::Vector3d&    ret, const char reference_frame, const bool filtered, const bool compensate_payload)
+{
+  Eigen::Vector6d wrench;
+  if( !getCartesianWrench(wrench, reference_frame, filtered, compensate_payload))
+    return false;
+   ret =  wrench.block(0,0,3,1);
+   return true;
+}
+bool iiwaRos::getCartesianTorque ( Eigen::Vector3d&    ret   , const char reference_frame, const bool filtered, const bool compensate_payload  )
+{
+  Eigen::Vector6d wrench;
+  if( !getCartesianWrench(wrench, reference_frame, filtered, compensate_payload))
+    return false;
+   ret =  wrench.block(3,0,3,1);
+   return true;
+}
+
+bool iiwaRos::getCartesianVelocity ( Eigen::Vector3d& vel, const char reference_frame, const bool filtered )
+{
+  Eigen::Vector6d twist;
+  if( !getCartesianTwist(twist, reference_frame, filtered))
+    return false;
+  vel =  twist.block(3,0,3,1);
+ return true;
+}
+
+bool iiwaRos::getCartesianOmega ( Eigen::Vector3d& omega , const char reference_frame, const bool filtered )
+{
+  Eigen::Vector6d twist;
+  if( !getCartesianTwist(twist, reference_frame, filtered))
+    return false;
+  omega =  twist.block(3,0,3,1);
+ return true;
+}
+
+Eigen::Vector7d iiwaRos::toJointVelocity(const Eigen::Vector3d& velocity, const Eigen::Vector3d& omega)
+{
+  if( !isFRIModalityActive() )
+  {
+    ROS_ERROR_THROTTLE(5,"Not yet supported");
+    assert(0);
+    return Eigen::Vector7d::Zero();
+  }
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().toJointVelocity(velocity, omega);
+  }
+}
+Eigen::Vector7d iiwaRos::toJointVelocity(const Eigen::VectorXd& q, const Eigen::Vector3d& velocity, const Eigen::Vector3d& omega)
+{
+  if( !isFRIModalityActive() )
+  {
+    ROS_ERROR_THROTTLE(5,"Not yet supported");
+    assert(0);
+    return Eigen::Vector7d::Zero();
+  }
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().toJointVelocity(q, velocity, omega);
+  }
+}
+bool iiwaRos::saturateVelocity(const Eigen::Vector7d& qd, Eigen::Vector7d& qd_saturated, double& scale )
+{
+  if( !isFRIModalityActive() )
+  {
+    ROS_ERROR_THROTTLE(5,"Not yet supported");
+    assert(0);
+    return false;
+  }
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().saturateVelocity(qd, qd_saturated, scale );
+  }
+}
+
+bool iiwaRos::saturateVelocity(const Eigen::Vector7d& qd, const Eigen::Vector7d& qd_max, Eigen::Vector7d& qd_saturated, double& scale )
+{
+  if( !isFRIModalityActive() )
+  {
+    ROS_ERROR_THROTTLE(5,"Not yet supported");
+    assert(0);
+    return false;
+  }
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().saturateVelocity(qd, qd_max, qd_saturated, scale );
+  }
+}
+
+
+
+Eigen::Vector6d iiwaRos::toCartsianTwist(const Eigen::Vector7d& qd)
+{
+  if( !isFRIModalityActive() )
+  {
+    ROS_ERROR_THROTTLE(5,"Not yet supported");
+    assert(0);
+    return Eigen::Vector6d::Zero();
+  }
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().toCartsianTwist(qd);
+  }
+}
+Eigen::Vector6d iiwaRos::toCartsianTwist(const Eigen::VectorXd& q, const Eigen::Vector7d& qd)
+{
+  if( !isFRIModalityActive() )
+  {
+    ROS_ERROR_THROTTLE(5,"Not yet supported");
+    assert(0);
+    return Eigen::Vector6d::Zero();
+  }
+  else
+  {
+    return servo_motion_service_.getFRIApp( )->getFRIClient().toCartsianTwist(q, qd);
+  }
+}
+
+bool iiwaRos::getJacobian(Eigen::Matrix67d& value)
 {
   if( !isFRIModalityActive() )
   {
@@ -334,19 +583,9 @@ bool iiwaRos::getJacobian(Eigen::MatrixXd& value)
   }
 }
 
-bool iiwaRos::getJointVelocity ( iiwa_msgs::JointVelocity& value )
+bool iiwaRos::getJointStiffness ( iiwa_msgs::JointStiffness& value )
 {
-  if( !isFRIModalityActive() )
-    return holder_state_joint_velocity_.get ( value );
-  else
-  {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().getJointVelocity (value);
-  }
-}
-
-bool iiwaRos::getJointPositionVelocity ( iiwa_msgs::JointPositionVelocity& value )
-{
-    return holder_state_joint_position_velocity_.get ( value );
+    return holder_state_joint_stiffness_.get ( value );
 }
 
 bool iiwaRos::getJointDamping ( iiwa_msgs::JointDamping& value )
@@ -492,7 +731,7 @@ bool iiwaRos::estimatePayload(const double estimation_time, const double toll)
   
   geometry_msgs::WrenchStamped wrench_msg;
   geometry_msgs::PoseStamped   pose_msg;
-  Eigen::VectorXd              wrench(6); wrench.setZero();
+  Eigen::Vector6d              wrench = Eigen::Vector6d::Zero();
   Eigen::Affine3d              pose;
   Eigen::Vector3d              torque; torque.setZero();
   
@@ -561,7 +800,6 @@ bool iiwaRos::estimatePayload(const double estimation_time, const double toll)
   return true;
 }
 
-
 bool iiwaRos::setWrenchOffset(const double estimation_time)
 {
   ROS_INFO("Estimation of the payload (no movement foreseen");
@@ -569,7 +807,7 @@ bool iiwaRos::setWrenchOffset(const double estimation_time)
   
   geometry_msgs::WrenchStamped wrench_msg;
   geometry_msgs::PoseStamped   pose_msg;
-  Eigen::VectorXd              wrench(6); wrench.setZero();
+  Eigen::Vector6d              wrench = Eigen::Vector6d::Zero();
 
   
   payload.compensation_method = Payload::OFFSET_ESTIMATION;
@@ -607,8 +845,7 @@ bool iiwaRos::setWrenchOffset(const double estimation_time)
   payload.initializated = true;
   return true;
 }
-  
-  
+   
 void iiwaRos::setJointPositionVelocity ( const iiwa_msgs::JointPositionVelocity& value )
 {
 #if defined( ENABLE_FRI )

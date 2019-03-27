@@ -54,7 +54,7 @@ int main( int argc, char** argv ) {
   
   // construct the lbr iiwa
   ros::NodeHandle iiwa_nh;
-  IIWA_HW iiwa_robot(iiwa_nh);
+  IiwaHw iiwa_robot(iiwa_nh);
   
   // configuration routines
   iiwa_robot.start();

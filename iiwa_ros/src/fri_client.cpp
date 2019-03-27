@@ -7,7 +7,7 @@
 #include <sensor_msgs/JointState.h>
 
 #include <ros/ros.h>
-#include <std_msgs/Int16.h>
+#include <std_msgs/Float32MultiArray.h>
 #include <iiwa_msgs/JointQuantity.h>
 #include <iiwa_msgs/JointPosition.h>
 #include <iiwa_msgs/JointVelocity.h>
@@ -98,21 +98,23 @@ LBRJointOverlayClient::LBRJointOverlayClient(const size_t target_queue_lenght )
 
   if( !nh.getParam( FRI_CYCLE_TIME_S_NS       , fri_cycle_time_s_   ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), FRI_CYCLE_TIME_S_NS .c_str()) ; throw std::runtime_error("Abort."); }
 
+  std::vector<double> max_joint_velocity_allowed;
+  if( !nh.getParam( MAX_JOINT_VELOCITY_ALLOWED_NS, max_joint_velocity_allowed ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), MAX_JOINT_VELOCITY_ALLOWED_NS.c_str()) ; throw std::runtime_error("Abort."); }
+
+
   double w_natural_frequency = wrench_freq_hz * 2 * M_PI ; // [rad/s]
   wrench_b_filter_.init( Eigen::Vector6d( wrench_deadband.data() ), Eigen::Vector6d( wrench_saturation.data() ), w_natural_frequency,  fri_cycle_time_s_, Eigen::Vector6d::Zero() );
 
   double t_natural_frequency = wrench_freq_hz * 2 * M_PI ; // [rad/s]
   twist_b_filter_ .init( Eigen::Vector6d( twist_deadband.data()  ), Eigen::Vector6d( twist_saturation.data()  ), t_natural_frequency ,  fri_cycle_time_s_, Eigen::Vector6d::Zero() );
 
-  joint_position_prev_.resize(KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
-  joint_position_     .resize(KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
-  joint_torque_       .resize(KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
-  joint_velocity_     .resize(KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
-  jacobian_           .resize(6,KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
+  joint_position_prev_= Eigen::Vector7d::Zero();
+  joint_position_     = Eigen::Vector7d::Zero();
+  joint_torque_       = Eigen::Vector7d::Zero();
+  joint_velocity_     = Eigen::Vector7d::Zero();
+  jacobian_           = Eigen::Matrix67d::Zero();
 
-  jacobian_       .setZero();
-  joint_velocity_ .setZero();
-  joint_torque_   .setZero();
+  max_joint_velocity_ = Eigen::Vector7d(max_joint_velocity_allowed.data() );
 
 }
 
@@ -246,61 +248,54 @@ void LBRJointOverlayClient::command()
 
 }
 
-
 void LBRJointOverlayClient::loggerThread()
 {
 
   ros::NodeHandle nh("~");
-  ros::Publisher logger_pub = nh.advertise<std_msgs::Int16>("iiwa_line_logger", 10000);
+  ros::Publisher logger_pub = nh.advertise<std_msgs::Float32MultiArray>("iiwa_line_logger", 10000);
   while( ros::ok() )
   {
-    std_msgs::Int16 data_log;
-    data_log.data =line_;
+    std_msgs::Float32MultiArray data_log;
+    data_log.data.resize(2);
+    data_log.data.at(0) =line_;
+    data_log.data.at(1) =last_.toSec();
     logger_pub.publish( data_log );
     ros::spinOnce();
-    ros::Duration(0.001).sleep();
+    ros::Duration(0.20).sleep();
   }
 
 }
 
-
 bool LBRJointOverlayClient::newJointPosCommand( const std::vector< double >& new_joint_pos_command )
 {
 
-  line_ = __LINE__;
+  line_ = __LINE__; last_ = ros::Time::now();
   if( new_joint_pos_command.size() != KUKA::FRI::LBRState::NUMBER_OF_JOINTS )
   {
+    line_ = __LINE__; last_ = ros::Time::now(); last_ = ros::Time::now();
+    ROS_ERROR("UFFA! Mismatch of New Command Vector?? ");
     return false;
-    // throw std::runtime_error("Mismatch of New Command Vector");
+    throw std::runtime_error("Mismatch of New Command Vector");
   }
-  if( command_joint_position_.empty() )
-  {
-    line_ = __LINE__;
-    command_joint_position_.push_back( new_joint_pos_command );
-    line_ = __LINE__;
-  }
-  else
-  {
-    std::vector<double> command_joint_position = command_joint_position_.back();
-    line_ = __LINE__;
-    command_joint_position_.push_back( new_joint_pos_command );
-    line_ = __LINE__;
-  }
+
+  line_ = __LINE__; last_ = ros::Time::now();
+  command_joint_position_.push_back( new_joint_pos_command );
+  line_ = __LINE__; last_ = ros::Time::now();
   return true;
 }
 
 bool LBRJointOverlayClient::newJointPosCommand( const iiwa_msgs::JointPosition& position )
 {
-  line_ = __LINE__;
+  line_ = __LINE__; last_ = ros::Time::now();
   std::vector<double> new_joint_pos_command( KUKA::FRI::LBRState::NUMBER_OF_JOINTS, 0.0 );
-  line_ = __LINE__;
-  new_joint_pos_command[0] = position.position.a1; line_ = __LINE__;
-  new_joint_pos_command[1] = position.position.a2; line_ = __LINE__;
-  new_joint_pos_command[2] = position.position.a3; line_ = __LINE__;
-  new_joint_pos_command[3] = position.position.a4; line_ = __LINE__;
-  new_joint_pos_command[4] = position.position.a5; line_ = __LINE__;
-  new_joint_pos_command[5] = position.position.a6; line_ = __LINE__;
-  new_joint_pos_command[6] = position.position.a7; line_ = __LINE__;
+  line_ = __LINE__; last_ = ros::Time::now();
+  new_joint_pos_command[0] = position.position.a1; line_ = __LINE__; last_ = ros::Time::now();
+  new_joint_pos_command[1] = position.position.a2; line_ = __LINE__; last_ = ros::Time::now();
+  new_joint_pos_command[2] = position.position.a3; line_ = __LINE__; last_ = ros::Time::now();
+  new_joint_pos_command[3] = position.position.a4; line_ = __LINE__; last_ = ros::Time::now();
+  new_joint_pos_command[4] = position.position.a5; line_ = __LINE__; last_ = ros::Time::now();
+  new_joint_pos_command[5] = position.position.a6; line_ = __LINE__; last_ = ros::Time::now();
+  new_joint_pos_command[6] = position.position.a7; line_ = __LINE__; last_ = ros::Time::now();
   
   return newJointPosCommand( new_joint_pos_command );
 }
@@ -375,7 +370,7 @@ void LBRJointOverlayClient::getState(KUKA::FRI::ESessionState& oldState, KUKA::F
   newState = actual_state_;
 }
 
-bool LBRJointOverlayClient::getJointPosition(Eigen::VectorXd &joint_pos ) const
+bool LBRJointOverlayClient::getJointPosition(Eigen::Vector7d &joint_pos ) const
 {
     joint_pos = joint_position_;
     return true;
@@ -394,7 +389,7 @@ bool LBRJointOverlayClient::getJointPosition ( iiwa_msgs::JointPosition& value )
   return true;
 }
 
-bool LBRJointOverlayClient::getJointTorque( Eigen::VectorXd& joint_tau ) const
+bool LBRJointOverlayClient::getJointTorque( Eigen::Vector7d& joint_tau ) const
 {
     joint_tau = joint_torque_;
     return true;
@@ -413,7 +408,7 @@ bool LBRJointOverlayClient::getJointTorque ( iiwa_msgs::JointTorque& value ) con
   return true;
 }
 
-bool LBRJointOverlayClient::getJointVelocity(Eigen::VectorXd &joint_vel ) const
+bool LBRJointOverlayClient::getJointVelocity( Eigen::Vector7d &joint_vel ) const
 {
   joint_vel = joint_velocity_;
   return true;
@@ -445,7 +440,7 @@ bool LBRJointOverlayClient::getCartesianPose ( geometry_msgs::PoseStamped& value
   return true;
 }
 
-bool LBRJointOverlayClient::getCartesianWrench( Eigen::VectorXd& wrench, const char frame, const bool filtered ) const
+bool LBRJointOverlayClient::getCartesianWrench( Eigen::Vector6d& wrench, const char frame, const bool filtered ) const
 {
 
     Eigen::VectorXd wrench_b = filtered ? filtered_wrench_b_ : raw_wrench_b_;
@@ -468,7 +463,7 @@ bool LBRJointOverlayClient::getCartesianWrench( Eigen::VectorXd& wrench, const c
 
 bool LBRJointOverlayClient::getCartesianWrench (geometry_msgs::WrenchStamped& value, const char frame  , const bool filtered)
 {
-  Eigen::VectorXd wrench(7); wrench.setZero();
+  Eigen::Vector6d wrench = Eigen::Vector6d::Zero();
   if(! getCartesianWrench(wrench, frame, filtered )  )
     return false;
 
@@ -483,13 +478,33 @@ bool LBRJointOverlayClient::getCartesianWrench (geometry_msgs::WrenchStamped& va
   return true;
 }
 
-bool LBRJointOverlayClient::getJacobian(Eigen::MatrixXd& value) const
- {
-   value = jacobian_;
-   return true;
- }
+bool LBRJointOverlayClient::getJacobian(Eigen::Matrix67d& value) const
+{
+ value = jacobian_;
+ return true;
+}
+bool LBRJointOverlayClient::getJacobian(const Eigen::Vector7d q, Eigen::Matrix67d& value) const
+{
+  KDL::JntArray   ja = KDL::JntArray(KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
+  for(size_t i=0;i<KUKA::FRI::LBRState::NUMBER_OF_JOINTS;i++)
+    ja(i) = q(i);
 
-bool LBRJointOverlayClient::getCartesianTwist(Eigen::Vector6d &twist , const char frame, const bool filtered) const
+  //////// JACOBIAN
+  KDL::Jacobian jac;
+  jac.resize(iiwa_chain_.getNrOfJoints());
+  jacsolver_->JntToJac (ja, jac );
+
+  assert( jac.columns() == 7 );
+  assert( jac.rows() == 6 );
+  for(size_t i=0; i<6; i++)
+    for(size_t j=0; j<7; j++)
+      value(i,j) = jac(i,j);
+  //////// JACOBIAN
+
+  return true;
+}
+
+bool LBRJointOverlayClient::getCartesianTwist(Eigen::Vector6d &twist, const char frame, const bool filtered) const
 {
   Eigen::VectorXd twist_b = filtered ? filtered_twist_b_ : raw_twist_b_;
   if( frame == 'b')
@@ -526,6 +541,127 @@ bool LBRJointOverlayClient::getCartesianTwist( geometry_msgs::TwistStamped& valu
   return true;
 }
 
+bool LBRJointOverlayClient::getCartesianRotation   ( Eigen::Matrix3d&    R     )
+{
+  Eigen::Affine3d cp;
+  getCartesianPose( cp );
+  R = cp.linear();
+}
+
+bool LBRJointOverlayClient::getCartesianQuaternion ( Eigen::Quaterniond& quat  ) { Eigen::Affine3d cp; getCartesianPose( cp ) ;  quat = Eigen::Quaterniond( cp.linear() ).normalized();  }
+bool LBRJointOverlayClient::getCartesianPoint      ( Eigen::Vector3d&    point ) { Eigen::Affine3d cp; getCartesianPose( cp ) ;  point(0) = cp.translation().x(); point(1) = cp.translation().y(); point(2) = cp.translation().z(); }
+bool LBRJointOverlayClient::getCartesianForce      ( Eigen::Vector3d&    ret, const char what  )  { Eigen::Vector6d tmp;
+  if(!getCartesianWrench( tmp, what ))
+    return false;
+  ret << tmp(0), tmp(1), tmp(2);
+  return true;
+}
+
+bool LBRJointOverlayClient::getCartesianTorque( Eigen::Vector3d& ret, const char what )
+{
+  Eigen::Vector6d tmp;
+  if(!getCartesianWrench( tmp, what ))
+    return false;
+  ret << tmp(3), tmp(4), tmp(5);
+  return true;
+}
+
+bool LBRJointOverlayClient::getCartesianVelocity( Eigen::Vector3d& vel, const char what )
+{
+  Eigen::Vector6d  vel6;
+  if(!getCartesianTwist( vel6, what ))
+    return false;
+  vel << vel6(0), vel6(1), vel6(2);
+  return true;
+}
+
+bool LBRJointOverlayClient::getCartesianOmega( Eigen::Vector3d& omega, const char what  )
+{
+  Eigen::Vector6d  vel6;
+  if(!getCartesianTwist( vel6, what ))
+    return false;
+  omega << vel6(0), vel6(1), vel6(2);
+  return true;
+}
+
+
+Eigen::Vector7d LBRJointOverlayClient::toJointVelocity(const Eigen::Vector3d& velocity, const Eigen::Vector3d& omega) const
+{
+  return toJointVelocity(joint_position_, velocity, omega);
+}
+
+Eigen::Vector7d LBRJointOverlayClient::toJointVelocity(const Eigen::Vector7d& q, const Eigen::Vector3d& velocity, const Eigen::Vector3d& omega) const
+{
+  Eigen::Vector7d qd;
+  Eigen::Vector6d v;
+
+  v.block(0,0,3,1) = velocity;
+  v.block(3,0,3,1) = omega;
+
+  KDL::JntArray   ja = KDL::JntArray(KUKA::FRI::LBRState::NUMBER_OF_JOINTS);
+  for(size_t i=0;i<KUKA::FRI::LBRState::NUMBER_OF_JOINTS;i++)
+    ja(i) = q(i);
+
+  Eigen::Matrix67d jacobian;
+  KDL::Jacobian jac;
+  jac.resize(iiwa_chain_.getNrOfJoints());
+  jacsolver_->JntToJac (ja, jac );
+
+  assert( jac.columns() == 7 );
+  assert( jac.rows() == 6 );
+  for(size_t i=0; i<6; i++)
+    for(size_t j=0; j<7; j++)
+      jacobian(i,j) = jac(i,j);
+
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd_jac(jacobian         ,  Eigen::ComputeThinU | Eigen::ComputeThinV);
+  double no_singularity=1;
+  if((svd_jac.singularValues()(5) == 0)
+  || (svd_jac.singularValues()(0) / svd_jac.singularValues()(5) > 1e2) )
+  {
+    no_singularity=0;
+    ROS_WARN_STREAM_THROTTLE(5,"SINGULARITY POINT (ellispoid deformed)");
+    ROS_WARN_STREAM_THROTTLE(5,"  q        : " << joint_position_.transpose() );
+    ROS_WARN_STREAM_THROTTLE(5,"  sin. val.: " << svd_jac.singularValues().transpose() );
+    qd = Eigen::Vector7d::Zero();
+  }
+  else
+  {
+    qd = svd_jac.solve(v);
+  }
+  return qd;
+}
+
+Eigen::Vector6d LBRJointOverlayClient::toCartsianTwist(const Eigen::Vector7d& qd)
+{
+  Eigen::Vector6d  ret;
+  Eigen::Matrix67d jac;
+  getJacobian(jac);
+  ret = jac * qd;
+  return ret;
+}
+Eigen::Vector6d LBRJointOverlayClient::toCartsianTwist(const Eigen::VectorXd& q, const Eigen::Vector7d& qd)
+{
+  Eigen::Vector6d  ret;
+  Eigen::Matrix67d jac;
+  getJacobian(q, jac);
+  ret = jac * qd;
+  return ret;
+}
+
+bool LBRJointOverlayClient::saturateVelocity(const Eigen::Vector7d& qd, Eigen::Vector7d& qd_saturated, double& scale ) const
+{
+  return saturateVelocity( qd, max_joint_velocity_, qd_saturated, scale );
+}
+
+
+bool LBRJointOverlayClient::saturateVelocity(const Eigen::Vector7d& qd, const Eigen::Vector7d& qd_max, Eigen::Vector7d& qd_saturated, double& scale ) const
+{
+  Eigen::Vector7d weights = qd.cwiseAbs().cwiseQuotient( qd_max.cwiseAbs() );
+  double max_ratio = weights.maxCoeff();
+  scale = max_ratio > 1 ?  (1. / max_ratio ) : 1.0;
+  qd_saturated = scale * qd;
+  return max_ratio > 1;
+}
 
 bool LBRJointOverlayClient::updatetFirstOrderKinematic( )
 {
@@ -537,7 +673,7 @@ bool LBRJointOverlayClient::updatetFirstOrderKinematic( )
   update_time_ = ros::Time::now();
 
   //////// VELOCITY
-  Eigen::VectorXd joint_Velocity_prev; joint_Velocity_prev.resize(7);
+  Eigen::Vector7d joint_Velocity_prev = Eigen::Vector7d::Zero();
   for(size_t i=0;i<KUKA::FRI::LBRState::NUMBER_OF_JOINTS;i++)
   {
     joint_position_(i) = jp[i];
@@ -589,7 +725,8 @@ bool LBRJointOverlayClient::updatetFirstOrderKinematic( )
       jacobian_(i,j) = jac(i,j);
   //////// JACOBIAN
 
-  Eigen::MatrixXd pinv = jacobian_.completeOrthogonalDecomposition().pseudoInverse();
+  Eigen::MatrixXd j    = jacobian_;
+  Eigen::MatrixXd pinv = j.completeOrthogonalDecomposition().pseudoInverse();
 
   raw_wrench_b_ = pinv.transpose() * joint_torque_;
   filtered_wrench_b_ = wrench_b_filter_.update( raw_wrench_b_ );
@@ -599,8 +736,6 @@ bool LBRJointOverlayClient::updatetFirstOrderKinematic( )
 
   return true;
 }
-
-
 
 bool LBRJointOverlayClient::isControlRunning( ) const { return control_running_; }
 

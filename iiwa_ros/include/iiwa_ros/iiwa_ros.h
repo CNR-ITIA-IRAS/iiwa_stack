@@ -30,22 +30,13 @@
   #include <realtime_utilities/circular_buffer.h>
 #endif
 
-#include <iiwa_msgs/CartesianVelocity.h>
-#include <iiwa_msgs/CartesianQuantity.h>
-#include <iiwa_msgs/JointPosition.h>
-#include <iiwa_msgs/JointStiffness.h>
-#include <iiwa_msgs/JointTorque.h>
-#include <iiwa_msgs/JointVelocity.h>
-#include <iiwa_msgs/JointPositionVelocity.h>
-#include <iiwa_msgs/JointDamping.h>
-#include <std_msgs//Time.h>
-#include <geometry_msgs/WrenchStamped.h>
-#include <geometry_msgs/PoseStamped.h>
+#include <ros/ros.h>
+#include <iiwa_ros/common.h>
 #include <iiwa_ros/servo_motion_service.h>
 #include <iiwa_ros/path_parameters_service.h>
 #include <iiwa_ros/time_to_destination_service.h>
-#include <iiwa_ros/conversions.h>
-#include <ros/ros.h>
+
+
 
 #include <kdl_parser/kdl_parser.hpp>
 #include <kdl/chain.hpp>
@@ -190,6 +181,7 @@ namespace iiwa_ros
      * @return bool
      */
     bool getCartesianPose(geometry_msgs::PoseStamped& value);
+    bool getCartesianPose(Eigen::Affine3d& pose );
     
     /**
      * @brief Returns true is a new Joint position of the robot is available.
@@ -198,6 +190,7 @@ namespace iiwa_ros
      * @return bool
      */
     bool getJointPosition(iiwa_msgs::JointPosition& value);
+    bool getJointPosition(Eigen::Vector7d& value);
     
     /**
      * @brief Returns true is a new Joint torque of the robot is available.
@@ -206,41 +199,52 @@ namespace iiwa_ros
      * @return bool
      */
     bool getJointTorque(iiwa_msgs::JointTorque& value);
-    
+    bool getJointTorque(Eigen::Vector7d& value);
+
+
     /**
-     * @brief Returns true is a new Joint stiffness of the robot is available.
-     * 
-     * @param value the current joint stiffness of the robot.
+     * @brief Returns true is a new Joint position velocity of the robot is available.
+     *
+     * @param value the current joint position velocity of the robot.
      * @return bool
      */
-    bool getJointStiffness(iiwa_msgs::JointStiffness& value);
-    
+    bool getJointVelocity(iiwa_msgs::JointVelocity& value);
+    bool getJointVelocity(Eigen::Vector7d& value);
     /**
      * @brief Returns true is a new Cartesian wrench of the robot is available.
      * 
      * @param value the current cartesian wrench of the robot.
      * @return bool
      */
-    bool getCartesianWrench(geometry_msgs::WrenchStamped& value, const char what = 'e', const bool filtered = true, const bool compensate_payload = true );
-    
-    bool getCartesianTwist( geometry_msgs::TwistStamped& twist, const char what = 'e', const bool filtered = true  );
-    
+    bool getCartesianWrench(geometry_msgs::WrenchStamped& value, const char reference_frame = 'e', const bool filtered = true, const bool compensate_payload = true );
+    bool getCartesianWrench(Eigen::Vector6d& value, const char reference_frame = 'e', const bool filtered = true, const bool compensate_payload = true );
+
+    bool getCartesianTwist( geometry_msgs::TwistStamped& twist, const char reference_frame = 'e', const bool filtered = true  );
+    bool getCartesianTwist( Eigen::Vector6d& twist, const char reference_frame = 'e', const bool filtered = true  );
+
+    Eigen::Vector7d toJointVelocity(const Eigen::Vector3d& velocity, const Eigen::Vector3d& omega);
+    Eigen::Vector7d toJointVelocity(const Eigen::VectorXd& q, const Eigen::Vector3d& velocity, const Eigen::Vector3d& omega);
+    Eigen::Vector6d toCartsianTwist(const Eigen::Vector7d& qd);
+    Eigen::Vector6d toCartsianTwist(const Eigen::VectorXd& q, const Eigen::Vector7d& qd);
+
+    bool saturateVelocity(const Eigen::Vector7d& qd, Eigen::Vector7d& qd_saturated, double& scale );
+    bool saturateVelocity(const Eigen::Vector7d& qd, const Eigen::Vector7d& qd_max, Eigen::Vector7d& qd_saturated, double& scale );
+
+    bool getCartesianRotation   ( Eigen::Matrix3d&    R     );
+    bool getCartesianQuaternion ( Eigen::Quaterniond& quat  );
+    bool getCartesianPoint      ( Eigen::Vector3d&    point );
+    bool getCartesianForce      ( Eigen::Vector3d&    ret   , const char reference_frame, const bool filtered = true, const bool compensate_payload = true );
+    bool getCartesianTorque     ( Eigen::Vector3d&    ret   , const char reference_frame, const bool filtered = true, const bool compensate_payload = true );
+    bool getCartesianVelocity   ( Eigen::Vector3d&    vel   , const char reference_frame, const bool filtered = true );
+    bool getCartesianOmega      ( Eigen::Vector3d&    omega , const char reference_frame, const bool filtered = true );
+
     /**
-     * @brief Returns true is a new Joint velocity of the robot is available.
-     * 
-     * @param value the current joint velocity of the robot.
+     * @brief Returns true is a new Joint stiffness of the robot is available.
+     *
+     * @param value the current joint stiffness of the robot.
      * @return bool
      */
-    bool getJointVelocity(iiwa_msgs::JointVelocity& value);
-    
-    /**
-     * @brief Returns true is a new Joint position velocity of the robot is available.
-     * 
-     * @param value the current joint position velocity of the robot.
-     * @return bool
-     */
-    bool getJointPositionVelocity(iiwa_msgs::JointPositionVelocity& value);
-    
+    bool getJointStiffness(iiwa_msgs::JointStiffness& value);
     /**
      * @brief Returns true is a new Joint damping of the robot is available.
      * 
@@ -249,7 +253,7 @@ namespace iiwa_ros
      */
     bool getJointDamping(iiwa_msgs::JointDamping& value);
 
-    bool getJacobian(Eigen::MatrixXd& value);
+    bool getJacobian(Eigen::Matrix67d &value);
     
     /**
      * @brief Returns the object that allows to call the configureSmartServo service.
@@ -345,8 +349,8 @@ namespace iiwa_ros
       double mass;
       Eigen::Vector3d distance;
       bool initializated;
-      Eigen::VectorXd wrench_offset_b;
-      Payload() : compensation_method(Payload::PAYLOAD_ESTIMATION), mass(0), distance(Eigen::Vector3d::Zero()), initializated(false),wrench_offset_b(Eigen::VectorXd(6).setZero() ){}
+      Eigen::Vector6d wrench_offset_b;
+      Payload() : compensation_method(Payload::PAYLOAD_ESTIMATION), mass(0), distance(Eigen::Vector3d::Zero()), initializated(false),wrench_offset_b(Eigen::Vector6d::Zero() ){}
     } payload;
 
     double dt_;
@@ -357,16 +361,5 @@ namespace iiwa_ros
 
 };
   
-bool CHECK_CLOCK(const ros::Time& what, const std::string& msg)
-{
-  ros::Time act = ros::Time::now();
-  if( (act-what).toSec() > 0.5 )
-  {
-    ROS_WARN("%s High communication latency....(%f,%f)",msg.c_str(), what.toSec(), act.toSec() );
-    return true;
-  }
-  return true;
-}
-
 
 }

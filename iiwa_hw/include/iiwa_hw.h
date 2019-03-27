@@ -40,10 +40,7 @@
 #include <iiwa_msgs/JointTorque.h>
 
 // ROS headers
-#include <controller_manager/controller_manager.h>
-#include <control_toolbox/filters.h>
-#include <hardware_interface/joint_state_interface.h>
-#include <hardware_interface/joint_command_interface.h>
+#include <itia_basic_hardware_interface/itia_basic_hardware_interface.h>
 #include <joint_limits_interface/joint_limits.h>
 #include <joint_limits_interface/joint_limits_interface.h>
 #include <joint_limits_interface/joint_limits_rosparam.h>
@@ -70,73 +67,57 @@ namespace shared_ptr_namespace = boost;
 constexpr int DEFAULT_CONTROL_FREQUENCY = 1000; // Hz
 constexpr int IIWA_JOINTS = 7;
 
-class IIWA_HW : public hardware_interface::RobotHW {
+class IiwaHw : public itia_hardware_interface::BasicRobotHW
+{
 public:
   /** 
    * Constructor
    */
-  IIWA_HW(ros::NodeHandle nh);
-  
-  /** 
-   * Destructor
-   */
-  virtual ~IIWA_HW();
-  
-  /** 
-   * \brief Initializes the IIWA device struct and all the hardware and joint limits interfaces needed.
-   * 	
-   * A joint state handle is created and linked to the current joint state of the IIWA robot.
-   * A joint position handle is created and linked  to the command joint position to send to the robot.
-   */
-  bool start();
+  IiwaHw(ros::NodeHandle nh);
   
   /**
-   * \brief Registers the limits of the joint specified by joint_name and joint_handle. 
-   * 
-   * The limits are retrieved from the urdf_model.
-   * Returns the joint's type, lower position limit, upper position limit, and effort limit.
+   * Destructor
    */
-  void registerJointLimits(const std::string& joint_name,
-                           const hardware_interface::JointHandle& joint_handle,
-                           const urdf::Model *const urdf_model,
-                           double *const lower_limit, double *const upper_limit,
-                           double *const effort_limit);
+  virtual ~IiwaHw();
   
+  virtual bool prepareSwitch(const std::list< hardware_interface::ControllerInfo >& start_list, const std::list< hardware_interface::ControllerInfo >& stop_list);
+
+  virtual bool init(ros::NodeHandle& root_nh, ros::NodeHandle &robot_hw_nh) ;
   /**
    * \brief Reads the current robot state via the IIWARos interfae and sends the values to the IIWA device struct.
    */
-  bool read(ros::Duration period);
+  bool read(const ros::Time& time, ros::Duration period);
   
   /**
    * \brief Sends the command joint position to the robot via IIWARos interface
    */
-  bool write(ros::Duration period);
-  
+  bool write(const ros::Time& time, ros::Duration period);
+
   /**
    * \brief Retuns the ros::Rate object to control the receiving/sending rate.
    */
   ros::Rate* getRate();
-  
+
   /**
    * \brief Retuns the current frequency used by a ros::Rate object to control the receiving/sending rate.
    */
   double getFrequency();
-  
+
   /**
    * \brief Set the frequency to be used by a ros::Rate object to control the receiving/sending rate.
    */
   void setFrequency(double frequency);
-  
+
   /** Structure for a lbr iiwa, joint handles, etc */
   struct IIWA_device {
     /** Vector containing the name of the joints - taken from yaml file */
     std::vector<std::string> joint_names;
-    
+
     std::vector<double>
     joint_lower_limits, /**< Lower joint limits */
     joint_upper_limits, /**< Upper joint limits */
     joint_effort_limits; /**< Effort joint limits */
-    
+
     /**< Joint state and commands */
     std::vector<double>
     joint_position,
@@ -147,8 +128,8 @@ public:
     joint_stiffness_command,
     joint_damping_command,
     joint_effort_command;
-    
-    /** 
+
+    /**
      * \brief Initialze vectors
      */
     void init() {
@@ -160,13 +141,13 @@ public:
       joint_effort_command.resize(IIWA_JOINTS);
       joint_stiffness_command.resize(IIWA_JOINTS);
       joint_damping_command.resize(IIWA_JOINTS);
-      
+
       joint_lower_limits.resize(IIWA_JOINTS);
       joint_upper_limits.resize(IIWA_JOINTS);
       joint_effort_limits.resize(IIWA_JOINTS);
     }
-    
-    /** 
+
+    /**
      * \brief Reset values of the vectors
      */
     void reset() {
@@ -177,15 +158,37 @@ public:
         joint_effort[j] = 0.0;
         joint_position_command[j] = 0.0;
         joint_effort_command[j] = 0.0;
-        
+
         // set default values for these two for now
         joint_stiffness_command[j] = 0.0;
         joint_damping_command[j] = 0.0;
       }
     }
   };
-  
+
 private:
+
+  /**
+   * \brief Initializes the IIWA device struct and all the hardware and joint limits interfaces needed.
+   *
+   * A joint state handle is created and linked to the current joint state of the IIWA robot.
+   * A joint position handle is created and linked  to the command joint position to send to the robot.
+   */
+  bool start();
+
+  /**
+   * \brief Registers the limits of the joint specified by joint_name and joint_handle.
+   *
+   * The limits are retrieved from the urdf_model.
+   * Returns the joint's type, lower position limit, upper position limit, and effort limit.
+   */
+  void registerJointLimits(const std::string& joint_name,
+                           const hardware_interface::JointHandle& joint_handle,
+                           const urdf::Model *const urdf_model,
+                           double *const lower_limit, double *const upper_limit,
+                           double *const effort_limit);
+
+
   
   /* Node handle */
   ros::NodeHandle nh_;
@@ -204,7 +207,7 @@ private:
   joint_limits_interface::PositionJointSaturationInterface pj_sat_interface_;
   joint_limits_interface::PositionJointSoftLimitsInterface pj_limits_interface_;
   
-  shared_ptr_namespace::shared_ptr<IIWA_HW::IIWA_device> device_; /**< IIWA device. */
+  shared_ptr_namespace::shared_ptr<IiwaHw::IIWA_device> device_; /**< IIWA device. */
   
   /** Objects to control send/receive rate. */
   ros::Time timer_;

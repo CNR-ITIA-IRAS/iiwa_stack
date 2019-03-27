@@ -37,7 +37,7 @@
 
 using namespace std;
 
-IIWA_HW::IIWA_HW(ros::NodeHandle nh) 
+IiwaHw::IiwaHw(ros::NodeHandle nh) 
 : last_joint_position_command_(7, 0) {
   nh_ = nh;
   
@@ -51,28 +51,28 @@ IIWA_HW::IIWA_HW(ros::NodeHandle nh)
   interface_type_.push_back("PositionJointFRIInterface");
 }
 
-IIWA_HW::~IIWA_HW() 
+IiwaHw::~IiwaHw() 
 {
   
 }
 
-ros::Rate* IIWA_HW::getRate() {
+ros::Rate* IiwaHw::getRate() {
   return loop_rate_;
 }
 
-double IIWA_HW::getFrequency() {
+double IiwaHw::getFrequency() {
   return control_frequency_;
 }
 
-void IIWA_HW::setFrequency(double frequency) {
+void IiwaHw::setFrequency(double frequency) {
   control_frequency_ = frequency;
   loop_rate_ = new ros::Rate(control_frequency_);
 }
 
-bool IIWA_HW::start() {
+bool IiwaHw::start() {
   
   // construct a new IIWA device (interface and state storage)
-  device_.reset( new IIWA_HW::IIWA_device() );
+  device_.reset( new IiwaHw::IIWA_device() );
   
   // TODO : make use of this
   // get inteface param or give default values
@@ -159,7 +159,7 @@ bool IIWA_HW::start() {
   return true;
 }
 
-void IIWA_HW::registerJointLimits(const std::string& joint_name, 
+void IiwaHw::registerJointLimits(const std::string& joint_name, 
                                   const hardware_interface::JointHandle& joint_handle, 
                                   const urdf::Model *const urdf_model, 
                                   double *const lower_limit, 
@@ -208,7 +208,7 @@ void IIWA_HW::registerJointLimits(const std::string& joint_name,
   }
 }
 
-bool IIWA_HW::read(ros::Duration period) {
+bool IiwaHw::read(ros::Duration period) {
   ros::Duration delta = ros::Time::now() - timer_;
   
   static bool was_connected = false;
@@ -242,7 +242,7 @@ bool IIWA_HW::read(ros::Duration period) {
   return 0;
 }
 
-bool IIWA_HW::write(ros::Duration period) {
+bool IiwaHw::write(ros::Duration period) {
   ej_sat_interface_.enforceLimits(period);
   ej_limits_interface_.enforceLimits(period);
   pj_sat_interface_.enforceLimits(period);

@@ -31,12 +31,35 @@
   #include <iiwa_fri/friLBRState.h>
 #endif
 
+#include <iiwa_msgs/CartesianVelocity.h>
+#include <iiwa_msgs/CartesianQuantity.h>
+#include <iiwa_msgs/JointPosition.h>
+#include <iiwa_msgs/JointStiffness.h>
+#include <iiwa_msgs/JointTorque.h>
+#include <iiwa_msgs/JointVelocity.h>
+#include <iiwa_msgs/JointPositionVelocity.h>
+#include <iiwa_msgs/JointDamping.h>
+
+#include <std_msgs/Time.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <geometry_msgs/WrenchStamped.h>
 #include <geometry_msgs/PoseStamped.h>
+
 #include <eigen3/Eigen/Core>
 #include <eigen3/Eigen/Dense>
 #include <eigen_conversions/eigen_kdl.h>
+
+namespace Eigen
+{
+  typedef Matrix<double, 7,  1> Vector7d;
+  typedef Matrix<double, 7, -1> Matrix7Xd;
+  typedef Matrix<double, 6,  1> Vector6d;
+  typedef Matrix<double, 6, -1> Matrix6Xd;
+  typedef Matrix<double, 6,  6> Matrix66d;
+  typedef Matrix<double, 6,  7> Matrix67d;
+}
+
+
 
 namespace iiwa_ros 
 {
@@ -155,7 +178,7 @@ namespace iiwa_ros
 
 
 
-  inline void eigenVectorToIiwaJointPosition( const Eigen::VectorXd& in, iiwa_msgs::JointPosition& out )
+  inline void eigenVectorToIiwaJointPosition( const Eigen::Vector7d& in, iiwa_msgs::JointPosition& out )
   {
       out.header.stamp = ros::Time::now();
 
@@ -167,7 +190,7 @@ namespace iiwa_ros
       out.position.a6  = in(5);
       out.position.a7  = in(6);
   }
-  inline void iiwaJointPositionToEigenVector( const iiwa_msgs::JointPosition& in, Eigen::VectorXd& out )
+  inline void iiwaJointPositionToEigenVector( const iiwa_msgs::JointPosition& in, Eigen::Vector7d& out )
   {
       out.resize(7);
       out.setZero();
@@ -179,7 +202,7 @@ namespace iiwa_ros
       out(5) = in.position.a6;
       out(6) = in.position.a7;
   }
-  inline void iiwaJointVelocityToEigenVector( const iiwa_msgs::JointVelocity& in, Eigen::VectorXd& out )
+  inline void iiwaJointVelocityToEigenVector( const iiwa_msgs::JointVelocity& in, Eigen::Vector7d& out )
   {
       out.resize(7);
       out.setZero();
@@ -192,7 +215,7 @@ namespace iiwa_ros
       out(6) = in.velocity.a7;
   }
 
-  inline void iiwaJointTorqueToEigenVector( const iiwa_msgs::JointTorque& in, Eigen::VectorXd& out )
+  inline void iiwaJointTorqueToEigenVector( const iiwa_msgs::JointTorque& in, Eigen::Vector7d& out )
   {
       out.resize(7);
       out.setZero();
@@ -205,7 +228,7 @@ namespace iiwa_ros
       out(6) = in.torque.a7;
   }
 
-  inline geometry_msgs::WrenchStamped toWrenchStamped(const Eigen::VectorXd& wrench)
+  inline geometry_msgs::WrenchStamped toWrenchStamped(const Eigen::Vector6d& wrench)
   {
       geometry_msgs::WrenchStamped msg;
 
@@ -222,7 +245,7 @@ namespace iiwa_ros
       return msg;
   }
 
-  inline geometry_msgs::TwistStamped toTwistStamped(const Eigen::VectorXd& velocity)
+  inline geometry_msgs::TwistStamped toTwistStamped(const Eigen::Vector6d& velocity)
   {
       geometry_msgs::TwistStamped msg;
 
@@ -256,7 +279,7 @@ namespace iiwa_ros
       return msg;
   }
 
-  inline Eigen::VectorXd poseToVec(const geometry_msgs::PoseStamped p)
+  inline Eigen::Vector6d poseToVec(const geometry_msgs::PoseStamped p)
   {
     Eigen::VectorXd v(6);
 

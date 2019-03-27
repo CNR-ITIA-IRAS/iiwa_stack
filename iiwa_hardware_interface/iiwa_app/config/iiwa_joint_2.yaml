@@ -1,0 +1,86 @@
+iiwa:
+  linkpos_to_vel_jnt2_1:
+  
+    controlled_joint: "iiwa_joint_2"
+    type: "itia/control/PositionToVelocityController"
+    setpoint_topic_name: "/joint_pos_target"
+    use_target_velocity: true
+    antiwindup_ratio: 1.0 #antiwindup_ratio = T_t/T_i
+    maximum_velocity: 2.0
+    position_minimum_error: 0.001
+    pos_filter:
+      A:
+      - [0.5]
+      B:
+      - [0.5]
+      Baw:
+      - [0.0 ]
+      C: 
+      - [0.0]
+      D:
+      - [1.0]
+      max_output:
+      - [30.0 ]
+      min_output:
+      - [-30.0 ]
+      initial_state:
+      - [0.00000000e+00 ]
+      initialization_matrix:
+      - [1.0 ]
+    target_pos_filter:
+      A:
+      - [0.5]
+      B:
+      - [0.5]
+      Baw:
+      - [0.0 ]
+      C: 
+      - [0.0]
+      D:
+      - [1.0]
+      max_output:
+      - [30.0 ]
+      min_output:
+      - [-30.0 ]
+      initial_state:
+      - [0.00000000e+00 ]
+      initialization_matrix:
+      - [1.0 ]
+    controller:
+      A:
+      - [0.0]
+      B:
+      - [0.0]
+      Baw:
+      - [0.0 ]
+      C:
+      - [0.00000e-00]
+      D:
+      - [1.0] #Kp
+      max_output:
+      - [ 10.000000e+00 ]
+      min_output:
+      - [-10.000000e+00 ]
+      initial_state:
+      - [0.00000000e+00 ]
+      initialization_matrix:
+      - [0.0 ]     
+    integral_controller:
+      A:
+      - [0.0]
+      B:
+      - [0.0]
+      Baw:
+      - [0.0 ]
+      C:
+      - [0.00000e-00]
+      D:
+      - [0.00000000e+00] #Kp
+      max_output:
+      - [ 1.000000e+00 ]
+      min_output:
+      - [-1.000000e+00 ]
+      initial_state:
+      - [0.00000000e+00 ]
+      initialization_matrix:
+      - [0.0 ]

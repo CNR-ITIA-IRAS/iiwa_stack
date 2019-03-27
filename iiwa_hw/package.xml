@@ -18,6 +18,8 @@
   <build_depend> roscpp </build_depend>
   <build_depend>iiwa_msgs</build_depend>
   <build_depend>iiwa_ros</build_depend>
+  <build_depend>itia_basic_hardware_interface</build_depend>
+
 
   <run_depend>controller_interface</run_depend>
   <run_depend>hardware_interface</run_depend>
@@ -25,5 +27,7 @@
   <run_depend>realtime_tools</run_depend>  
   <run_depend>iiwa_msgs</run_depend>
   <run_depend>iiwa_ros</run_depend>
-  
+  <run_depend>itia_basic_hardware_interface</run_depend>
+
+
 </package>

@@ -38,15 +38,7 @@
 #include <realtime_utilities/circular_buffer.h>
 #include <eigen_state_space_systems/eigen_common_filters.h>
 
-
-namespace Eigen
-{
-  typedef Matrix<double, 6,  1> Vector6d;
-  typedef Matrix<double, 6, -1> Matrix6Xd;
-  typedef Matrix<double, 6, 6> Matrix66d;
-}
-
-
+#include <iiwa_ros/common.h>
 
 inline double timer_difference_s( struct timespec *timeA_p, struct timespec *timeB_p )
 {
@@ -162,30 +154,27 @@ namespace iiwa_ros
 {
 
 static const std::string FRI_CYCLE_TIME_S_NS = "fri/cycle_time_s";
+static const std::string MAX_JOINT_VELOCITY_ALLOWED_NS = "fri/max_joint_velocity_allowed";
 
-static const std::string WRENCH_FILTER_SATURATION_NS = "fri/filter/wrench/saturation";
-static const std::string WRENCH_FILTER_DEADBAND_NS   = "fri/filter/wrench/deadband";
-static const std::string WRENCH_FILTER_FREQUENCY_NS  = "fri/filter/wrench/cutoff_frequency_hz";
+static const std::string WRENCH_FILTER_SATURATION_NS   = "fri/filter/wrench/saturation";
+static const std::string WRENCH_FILTER_DEADBAND_NS     = "fri/filter/wrench/deadband";
+static const std::string WRENCH_FILTER_FREQUENCY_NS    = "fri/filter/wrench/cutoff_frequency_hz";
 
-static const std::string TWIST_FILTER_SATURATION_NS  = "fri/filter/twist/saturation";
-static const std::string TWIST_FILTER_DEADBAND_NS    = "fri/filter/twist/deadband";
-static const std::string TWIST_FILTER_FREQUENCY_NS   = "fri/filter/twist/cutoff_frequency_hz";
+static const std::string TWIST_FILTER_SATURATION_NS    = "fri/filter/twist/saturation";
+static const std::string TWIST_FILTER_DEADBAND_NS      = "fri/filter/twist/deadband";
+static const std::string TWIST_FILTER_FREQUENCY_NS     = "fri/filter/twist/cutoff_frequency_hz";
 
-static const std::string FRI_PORT_NS                 = "fri/port";
-static const std::string FRI_HOSTNAME_NS             = "fri/hostname";
-static const std::string FRI_TIMEOUT_MS_NS           = "fri/timeout_ms";
-static const std::string ROBOT_DESCRIPTION_NS        = "fri/robot_description_param";
-static const std::string ROBOT_LINK_BASE_NS          = "fri/base_link";
-static const std::string ROBOT_TOOL_BASE_NS          = "fri/tool_link";
+static const std::string FRI_PORT_NS                   = "fri/port";
+static const std::string FRI_HOSTNAME_NS               = "fri/hostname";
+static const std::string FRI_TIMEOUT_MS_NS             = "fri/timeout_ms";
+static const std::string ROBOT_DESCRIPTION_NS          = "fri/robot_description_param";
+static const std::string ROBOT_LINK_BASE_NS            = "fri/base_link";
+static const std::string ROBOT_TOOL_BASE_NS            = "fri/tool_link";
 
 
 class LBRJointOverlayClient : public KUKA::FRI::LBRClient
 {
-private:
 
-  std::thread logger;
-  void loggerThread();
-  int line_;
 
   public:
   
@@ -207,30 +196,52 @@ private:
     virtual void newWrenchCommand( const iiwa_msgs::CartesianQuantity& wrench ) ;
 
     virtual bool getJointPosition ( iiwa_msgs::JointPosition& value ) const;
-    virtual bool getJointPosition ( Eigen::VectorXd& joint_pos ) const;
+    virtual bool getJointPosition ( Eigen::Vector7d& joint_pos ) const;
 
     virtual bool getJointTorque ( iiwa_msgs::JointTorque& value ) const;
-    virtual bool getJointTorque ( Eigen::VectorXd& joint_tau ) const;
+    virtual bool getJointTorque ( Eigen::Vector7d& joint_tau ) const;
 
     virtual bool getJointVelocity ( iiwa_msgs::JointVelocity& value ) const;
-    virtual bool getJointVelocity ( Eigen::VectorXd& joint_vel ) const;
+    virtual bool getJointVelocity ( Eigen::Vector7d& joint_vel ) const;
 
     virtual bool getCartesianPose ( geometry_msgs::PoseStamped& value ) const;
     virtual bool getCartesianPose ( Eigen::Affine3d& pose ) const;
 
     virtual bool getCartesianWrench( geometry_msgs::WrenchStamped& value, const char frame, const bool filtered = true  );
-    virtual bool getCartesianWrench(Eigen::VectorXd& wrench, const char frame, const bool filtered = true ) const;
+    virtual bool getCartesianWrench( Eigen::Vector6d& wrench, const char frame, const bool filtered = true ) const;
 
     virtual bool getCartesianTwist( Eigen::Vector6d& twist, const char frame, const bool filtered = true ) const;
     virtual bool getCartesianTwist( geometry_msgs::TwistStamped& value, const char frame, const bool filtered = true ) const;
 
-    virtual bool getJacobian(Eigen::MatrixXd& value) const;
+    bool getCartesianRotation   ( Eigen::Matrix3d&    R     );
+    bool getCartesianQuaternion ( Eigen::Quaterniond& quat  );
+    bool getCartesianPoint      ( Eigen::Vector3d&    point );
+    bool getCartesianForce      ( Eigen::Vector3d&    ret   , const char reference_frame );
+    bool getCartesianTorque     ( Eigen::Vector3d&    ret   , const char reference_frame );
+    bool getCartesianVelocity   ( Eigen::Vector3d&    vel   , const char reference_frame );
+    bool getCartesianOmega      ( Eigen::Vector3d&    omega , const char reference_frame );
+
+
+    virtual bool getJacobian(Eigen::Matrix67d& value) const;
+    virtual bool getJacobian(const Eigen::Vector7d q, Eigen::Matrix67d& value) const;
 
     virtual bool isControlRunning( ) const;
 
     virtual bool updatetFirstOrderKinematic( );
 
+    virtual Eigen::Vector7d toJointVelocity(const Eigen::Vector3d& velocity, const Eigen::Vector3d& omega) const;
+    virtual Eigen::Vector7d toJointVelocity(const Eigen::Vector7d& q, const Eigen::Vector3d& velocity, const Eigen::Vector3d& omega) const;
+    virtual Eigen::Vector6d toCartsianTwist(const Eigen::Vector7d& qd);
+    virtual Eigen::Vector6d toCartsianTwist(const Eigen::VectorXd& q, const Eigen::Vector7d& qd);
+
+    bool saturateVelocity(const Eigen::Vector7d& qd, Eigen::Vector7d& qd_saturated, double& scale ) const;
+    bool saturateVelocity(const Eigen::Vector7d& qd, const Eigen::Vector7d& qd_max, Eigen::Vector7d& qd_saturated, double& scale ) const;
   private:
+
+    std::thread logger;
+    void loggerThread();
+    int line_;
+    ros::Time last_;
 
     realtime_utilities::circ_buffer< std::vector<double> > command_joint_position_;
     realtime_utilities::circ_buffer< std::vector<double> > command_joint_torque_;
@@ -261,11 +272,12 @@ private:
     Filter            twist_b_filter_;
 
     Eigen::Affine3d   cartesian_pose_;
-    Eigen::VectorXd   joint_torque_;
-    Eigen::VectorXd   joint_position_;
-    Eigen::VectorXd   joint_position_prev_;
-    Eigen::VectorXd   joint_velocity_;
-    Eigen::MatrixXd   jacobian_;
+    Eigen::Vector7d   joint_torque_;
+    Eigen::Vector7d   joint_position_;
+    Eigen::Vector7d   joint_position_prev_;
+    Eigen::Vector7d   joint_velocity_;
+    Eigen::Vector7d   max_joint_velocity_;
+    Eigen::Matrix67d  jacobian_;
 
     double fri_cycle_time_s_;
     ros::Time update_time_;

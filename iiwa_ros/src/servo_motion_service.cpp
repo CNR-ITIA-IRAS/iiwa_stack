@@ -21,8 +21,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <iiwa_ros/common.h>
 #include <iiwa_ros/servo_motion_service.h>
-#include <iiwa_ros/conversions.h>
 #include <iiwa_msgs/ControlMode.h>
 
 
