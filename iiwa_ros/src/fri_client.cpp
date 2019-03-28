@@ -688,11 +688,7 @@ bool LBRJointOverlayClient::updatetFirstOrderKinematic( )
     first_entry = false;
   }
   joint_velocity_ = ( joint_position_- joint_position_prev_ ) / fri_cycle_time_s_;
-//  ROS_INFO_STREAM_THROTTLE(5,"---\njp     : " << joint_position_.transpose()
-//                             << "\njp_prev: " << joint_position_prev_.transpose()
-//                             << "\ndjp    : " << (joint_position_-joint_position_prev_).transpose()
-//                             << "\ndt     : " << fri_cycle_time_s_
-//                             << "\njv     : " << joint_velocity_.transpose() );
+
   joint_position_prev_ = joint_position_;
   //////// VELOCITY
 
