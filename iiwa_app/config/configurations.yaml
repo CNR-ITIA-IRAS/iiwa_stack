@@ -1,0 +1,60 @@
+control_configurations:
+  - name: "watch"
+    components: 
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "js_pub"
+
+  - name: "thor_prefilter_planner"
+    components: 
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "js_pub"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "thor_prefilter_planner"
+        
+  - name: "joint_impedance"
+    components:
+      - description: ""
+        hardware_interface: "planner_joint_impedance_hi"
+        controller        : "thor"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "joint_impedance_ctrl"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "js_pub"
+    
+  - name: "cartesian_impedance"
+    components:
+      - description: ""
+        hardware_interface: "planner_joint_impedance_hi"
+        controller        : "thor"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "cartesian_impedance_ctrl"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "js_pub"
+    
+  - name: "teleop_impedance"
+    components:
+      - description: ""
+        hardware_interface: "planner_joint_impedance_hi"
+        controller        : "joint_teleop_ctrl"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "joint_impedance_ctrl"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "js_pub"
+        
+  - name: "teleop"
+    components:
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "joint_teleop_ctrl"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "js_pub"

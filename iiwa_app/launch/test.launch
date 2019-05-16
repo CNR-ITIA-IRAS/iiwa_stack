@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<launch>
+  <node pkg="nodelet" type="nodelet" name="manager"  args="manager" output="screen"> 
+    <param name="num_worker_threads" value="20" />
+  </node>
+  
+<!--   <rosparam command="load" file="$(find iiwa_app)/config/test.yaml" /> -->
+  <rosparam command="load" file="$(find iiwa_app)/config/configurations.yaml" />
+  <rosparam command="load" file="$(find iiwa_app)/config/iiwa_hi.yaml" />
+  <rosparam command="load" file="$(find iiwa_app)/config/planner_joint_impedance_hi.yaml" />
+
+  <arg name="hardware_interface" default="PositionJointInterface"/>
+  <arg name="robot_name" default="iiwa"/>
+  <arg name="model" default="iiwa14"/>
+  
+  <rosparam command="load" file="$(find iiwa_hw)/config/joint_names.yaml" />
+  <param name="/iiwa/interface" value="$(arg hardware_interface)"/>
+  
+  <node pkg="itia_configuration_manager" type="configuration_manager" name="controller_manager" output="screen"/> 
+  <node pkg="itia_configuration_manager" type="configuration_user_interface" name="configuration_user_interface" output="screen"/> 
+  
+  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find iiwa_description)/urdf/iiwa14.urdf.xacro'"/>
+
+  <node pkg="robot_state_publisher" type="robot_state_publisher" name="iiwa_robot_state_publisher"/>
+  
+  <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" output="screen">
+      <rosparam param="source_list">["/iiwa/joint_states"]</rosparam>
+  </node>
+
+  
+  
+</launch>
+
