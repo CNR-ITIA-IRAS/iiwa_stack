@@ -10,6 +10,7 @@
  * Manuel Bonilla - josemanuelbonilla@gmail.com
  * 
  * LICENSE :
+ * 
  * Copyright (C) 2016-2017 Salvatore Virga - salvo.virga@tum.de, Marco Esposito - marco.esposito@tum.de
  * Technische Universität München
  * Chair for Computer Aided Medical Procedures and Augmented Reality
@@ -38,9 +39,12 @@
 #include <iiwa_ros/iiwa_ros.h>
 #include <iiwa_msgs/JointPosition.h>
 #include <iiwa_msgs/JointTorque.h>
+#include <realtime_tools/realtime_publisher.h>
 
 // ROS headers
 #include <itia_basic_hardware_interface/itia_basic_hardware_interface.h>
+#include <itia_basic_hardware_interface/posveleff_command_interface.h>
+#include <hardware_interface/posvelacc_command_interface.h>
 #include <joint_limits_interface/joint_limits.h>
 #include <joint_limits_interface/joint_limits_interface.h>
 #include <joint_limits_interface/joint_limits_rosparam.h>
@@ -67,45 +71,66 @@ namespace shared_ptr_namespace = boost;
 constexpr int DEFAULT_CONTROL_FREQUENCY = 1000; // Hz
 constexpr int IIWA_JOINTS = 7;
 
+namespace iiwa_hw{
+
+enum IIWA_CONTROL_MODE
+{
+    FRI = 0
+//     ,SERVO_MOTION = 1,
+};
+
+const std::map<std::string, IIWA_CONTROL_MODE> iiwa_control_map_ = {
+    {"fri",iiwa_hw::FRI}
+   ,{"Fri",iiwa_hw::FRI}
+   ,{"FRI",iiwa_hw::FRI}
+};
+
 class IiwaHw : public itia_hardware_interface::BasicRobotHW
 {
 public:
+  
   /** 
-   * Constructor
-   */
+  * Constructor
+  */
   IiwaHw(ros::NodeHandle nh);
   
   /**
-   * Destructor
-   */
+  * Destructor
+  */
   virtual ~IiwaHw();
   
   virtual bool prepareSwitch(const std::list< hardware_interface::ControllerInfo >& start_list, const std::list< hardware_interface::ControllerInfo >& stop_list);
 
+  /**
+  * \brief Initializes the IIWA device struct and all the hardware and joint limits interfaces needed.
+  *
+  * A joint state handle is created and linked to the current joint state of the IIWA robot.
+  * A joint position handle is created and linked  to the command joint position to send to the robot.
+  */
   virtual bool init(ros::NodeHandle& root_nh, ros::NodeHandle &robot_hw_nh) ;
   /**
-   * \brief Reads the current robot state via the IIWARos interfae and sends the values to the IIWA device struct.
-   */
-  bool read(const ros::Time& time, ros::Duration period);
+  * \brief Reads the current robot state via the IIWARos interfae and sends the values to the IIWA device struct.
+  */
+  virtual void read(const ros::Time& time, const ros::Duration& period);
   
   /**
-   * \brief Sends the command joint position to the robot via IIWARos interface
-   */
-  bool write(const ros::Time& time, ros::Duration period);
+  * \brief Sends the command joint position to the robot via IIWARos interface
+  */
+  virtual void write(const ros::Time& time, const ros::Duration& period);
 
   /**
-   * \brief Retuns the ros::Rate object to control the receiving/sending rate.
-   */
+  * \brief Retuns the ros::Rate object to control the receiving/sending rate.
+  */
   ros::Rate* getRate();
 
   /**
-   * \brief Retuns the current frequency used by a ros::Rate object to control the receiving/sending rate.
-   */
+  * \brief Retuns the current frequency used by a ros::Rate object to control the receiving/sending rate.
+  */
   double getFrequency();
 
   /**
-   * \brief Set the frequency to be used by a ros::Rate object to control the receiving/sending rate.
-   */
+  * \brief Set the frequency to be used by a ros::Rate object to control the receiving/sending rate.
+  */
   void setFrequency(double frequency);
 
   /** Structure for a lbr iiwa, joint handles, etc */
@@ -125,19 +150,24 @@ public:
     joint_velocity,
     joint_effort,
     joint_position_command,
+    joint_velocity_command,
     joint_stiffness_command,
     joint_damping_command,
     joint_effort_command;
+    
+    geometry_msgs::WrenchStamped wrench_ee;
+    geometry_msgs::WrenchStamped wrench_b;
 
     /**
-     * \brief Initialze vectors
-     */
+    * \brief Initialze vectors
+    */
     void init() {
       joint_position.resize(IIWA_JOINTS);
       joint_position_prev.resize(IIWA_JOINTS);
       joint_velocity.resize(IIWA_JOINTS);
       joint_effort.resize(IIWA_JOINTS);
       joint_position_command.resize(IIWA_JOINTS);
+      joint_velocity_command.resize(IIWA_JOINTS);
       joint_effort_command.resize(IIWA_JOINTS);
       joint_stiffness_command.resize(IIWA_JOINTS);
       joint_damping_command.resize(IIWA_JOINTS);
@@ -148,8 +178,8 @@ public:
     }
 
     /**
-     * \brief Reset values of the vectors
-     */
+    * \brief Reset values of the vectors
+    */
     void reset() {
       for (int j = 0; j < IIWA_JOINTS; ++j) {
         joint_position[j] = 0.0;
@@ -157,6 +187,7 @@ public:
         joint_velocity[j] = 0.0;
         joint_effort[j] = 0.0;
         joint_position_command[j] = 0.0;
+        joint_velocity_command[j] = 0.0;
         joint_effort_command[j] = 0.0;
 
         // set default values for these two for now
@@ -169,37 +200,34 @@ public:
 private:
 
   /**
-   * \brief Initializes the IIWA device struct and all the hardware and joint limits interfaces needed.
-   *
-   * A joint state handle is created and linked to the current joint state of the IIWA robot.
-   * A joint position handle is created and linked  to the command joint position to send to the robot.
-   */
-  bool start();
-
-  /**
-   * \brief Registers the limits of the joint specified by joint_name and joint_handle.
-   *
-   * The limits are retrieved from the urdf_model.
-   * Returns the joint's type, lower position limit, upper position limit, and effort limit.
-   */
+  * \brief Registers the limits of the joint specified by joint_name and joint_handle.
+  *
+  * The limits are retrieved from the urdf_model.
+  * Returns the joint's type, lower position limit, upper position limit, and effort limit.
+  */
   void registerJointLimits(const std::string& joint_name,
-                           const hardware_interface::JointHandle& joint_handle,
-                           const urdf::Model *const urdf_model,
-                           double *const lower_limit, double *const upper_limit,
-                           double *const effort_limit);
+                          const hardware_interface::JointHandle& joint_handle,
+                          const urdf::Model *const urdf_model,
+                          double *const lower_limit, double *const upper_limit,
+                          double *const effort_limit);
 
 
   
   /* Node handle */
   ros::NodeHandle nh_;
   
+  iiwa_hw::IIWA_CONTROL_MODE iiwa_control_mode_;
+  
   /* Parameters */
   std::string interface_, movegroup_name_;
   urdf::Model urdf_model_;
   
-  hardware_interface::JointStateInterface state_interface_; /**< Interface for joint state */
-  hardware_interface::EffortJointInterface effort_interface_; /**< Interface for joint impedance control */
-  hardware_interface::PositionJointInterface position_interface_; /**< Interface for joint position control */
+  hardware_interface::JointStateInterface     state_interface_; /**< Interface for joint state */
+  hardware_interface::EffortJointInterface    effort_interface_; /**< Interface for joint impedance control */
+  hardware_interface::PositionJointInterface  position_interface_; /**< Interface for joint position control */
+  hardware_interface::VelocityJointInterface  velocity_interface_; /**< Interface for joint position control */
+  hardware_interface::PosVelJointInterface    pos_vel_interface_; /**< Interface for joint position control */
+  hardware_interface::PosVelEffJointInterface pos_vel_eff_interface_; /**< Interface for joint position control */
   
   /** Interfaces for limits */
   joint_limits_interface::EffortJointSaturationInterface   ej_sat_interface_;
@@ -213,10 +241,12 @@ private:
   ros::Time timer_;
   ros::Rate* loop_rate_;
   double control_frequency_;
+  double fri_cycle_time_;
   
-  iiwa_ros::iiwaRos iiwa_ros_conn_;
+  iiwa_ros::iiwaRos        iiwa_ros_conn_;
   iiwa_msgs::JointPosition joint_position_;
-  iiwa_msgs::JointTorque joint_torque_;
+  iiwa_msgs::JointVelocity joint_velocity_;
+  iiwa_msgs::JointTorque   joint_torque_;
   
   iiwa_msgs::JointPosition command_joint_position_;
   iiwa_msgs::JointTorque command_joint_torque_;
@@ -224,6 +254,8 @@ private:
   std::vector<double> last_joint_position_command_;
   
   std::vector<std::string> interface_type_; /**< Contains the strings defining the possible hardware interfaces. */
+  std::shared_ptr< realtime_tools::RealtimePublisher< geometry_msgs::WrenchStamped > > wrench_ee_pub_;
+  std::shared_ptr< realtime_tools::RealtimePublisher< geometry_msgs::WrenchStamped > > wrench_b_pub_ ;
 };
 
 template <typename T>
@@ -246,4 +278,5 @@ void vectorToIiwaMsgsJoint(const std::vector<T>& v, iiwa_msgs::JointQuantity& ax
   ax.a5 = v[4];
   ax.a6 = v[5];
   ax.a7 = v[6];
+}
 }

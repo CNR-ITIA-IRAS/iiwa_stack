@@ -1,0 +1,8 @@
+
+<library path="lib/libiiwa_hw">
+  <class name="itia/control/IiwaHwIfaceNodelet" type="itia::control::IiwaHwIfaceNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      Iiwa nodelet
+    </description>
+  </class>
+</library>

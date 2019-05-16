@@ -36,25 +36,30 @@
 #include "iiwa_hw.h"
 
 using namespace std;
-
+namespace iiwa_hw
+{
 IiwaHw::IiwaHw(ros::NodeHandle nh) 
 : last_joint_position_command_(7, 0) {
   nh_ = nh;
-  
-  timer_ = ros::Time::now();
   control_frequency_ = DEFAULT_CONTROL_FREQUENCY;
-  loop_rate_ = new ros::Rate(control_frequency_);
-  
   interface_type_.push_back("PositionJointInterface");
   interface_type_.push_back("EffortJointInterface");
   interface_type_.push_back("VelocityJointInterface");
   interface_type_.push_back("PositionJointFRIInterface");
+  
+  ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
 }
 
 IiwaHw::~IiwaHw() 
 {
   
 }
+
+bool IiwaHw::prepareSwitch(const std::list< hardware_interface::ControllerInfo >& start_list, const std::list< hardware_interface::ControllerInfo >& stop_list)
+{
+  return true;
+}
+
 
 ros::Rate* IiwaHw::getRate() {
   return loop_rate_;
@@ -69,7 +74,42 @@ void IiwaHw::setFrequency(double frequency) {
   loop_rate_ = new ros::Rate(control_frequency_);
 }
 
-bool IiwaHw::start() {
+bool IiwaHw::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw_nh)
+{  
+  if (!itia_hardware_interface::BasicRobotHW::init(root_nh, robot_hw_nh))
+  {
+    ROS_ERROR("[%s] IiwaHw error",robot_hw_nh.getNamespace().c_str());
+    return false;
+  }
+  
+  loop_rate_ = new ros::Rate(control_frequency_);
+  if(!root_nh.getParam("cycle_time",fri_cycle_time_))
+  {
+    fri_cycle_time_ = 0.005;
+    ROS_INFO("[%s] /fri_cycle_time param not set. usin default 0.005 s",root_nh.getNamespace().c_str());
+  }
+  
+  std::string iiwa_control_mode;
+  if(!robot_hw_nh.getParam("iiwa_control_mode",iiwa_control_mode))
+  {
+    ROS_ERROR("[%s] iiwa_control_mode not found on rosparam. return",robot_hw_nh.getNamespace().c_str());
+    return false;
+  }
+  
+  ROS_INFO("iiwa in %s control mode",iiwa_control_mode.c_str());
+  
+  if(!iiwa_control_map_.count(iiwa_control_mode))
+  {
+    ROS_ERROR("[%s] does not exist. return",iiwa_control_mode.c_str());
+    return false;
+  }
+  else
+  {
+    iiwa_control_mode_ = iiwa_control_map_.at( iiwa_control_mode );
+  }
+  
+  wrench_ee_pub_.reset( new realtime_tools::RealtimePublisher<geometry_msgs::WrenchStamped>(nh_, "wrench_tool", 4));
+  wrench_b_pub_ .reset( new realtime_tools::RealtimePublisher<geometry_msgs::WrenchStamped>(nh_, "wrench_base", 4));
   
   // construct a new IIWA device (interface and state storage)
   device_.reset( new IiwaHw::IIWA_device() );
@@ -98,7 +138,26 @@ bool IiwaHw::start() {
     throw std::runtime_error("No URDF model available");
   }
   
-  iiwa_ros_conn_.init();
+  ROS_INFO("Init IIWA ROS CONN (%s)", robot_hw_nh.getNamespace().c_str() );
+  iiwa_ros_conn_.init(robot_hw_nh,fri_cycle_time_,true);
+  
+  switch (iiwa_control_mode_)
+  {
+    case FRI:
+    {
+      if(!iiwa_ros_conn_.getServoMotion().setFRIJointPositionControlMode( ))
+      {
+        ROS_ERROR("error in set FRI joint position control mode. return");
+        return false;
+      }
+      while(!iiwa_ros_conn_.getRobotIsConnected())
+      {
+        ros::Duration(0.1).sleep();
+        ROS_INFO_THROTTLE(2,"waiting for robot connection");
+      }
+      break;
+    }
+  }
   
   // initialize and set to zero the state and command values
   device_->init();
@@ -128,20 +187,25 @@ bool IiwaHw::start() {
     
     state_interface_.registerHandle(state_handle);
     
-    // position command handle
-    hardware_interface::JointHandle position_joint_handle = hardware_interface::JointHandle(
-      state_interface_.getHandle(device_->joint_names[i]), &device_->joint_position_command[i]);
+    position_interface_.registerHandle( hardware_interface::JointHandle             (state_handle, 
+                                                                                     &device_->joint_position_command[i]) );
+    velocity_interface_.registerHandle( hardware_interface::JointHandle             (state_handle, 
+                                                                                     &device_->joint_velocity_command[i]) );
+    effort_interface_  .registerHandle( hardware_interface::JointHandle             (state_handle, 
+                                                                                     &device_->joint_effort_command  [i]) );
+    pos_vel_interface_ .registerHandle( hardware_interface::PosVelJointHandle       (state_handle, 
+                                                                                     &device_->joint_position_command[i],
+                                                                                     &device_->joint_velocity_command[i]) );
+    pos_vel_eff_interface_ .registerHandle( hardware_interface::PosVelEffJointHandle(state_handle, 
+                                                                                     &device_->joint_position_command[i],
+                                                                                     &device_->joint_velocity_command[i],
+                                                                                     &device_->joint_effort_command[i]) );
     
-    position_interface_.registerHandle(position_joint_handle);
     
-    // effort command handle
-    hardware_interface::JointHandle joint_handle = hardware_interface::JointHandle(
-      state_interface_.getHandle(device_->joint_names[i]), &device_->joint_effort_command[i]);
-    
-    effort_interface_.registerHandle(joint_handle);
+    hardware_interface::JointHandle effort_joint_handle = hardware_interface::JointHandle(state_handle, &device_->joint_effort_command  [i]);
     
     registerJointLimits(device_->joint_names[i],
-                        joint_handle,
+                        effort_joint_handle,
                         &urdf_model_,
                         &device_->joint_lower_limits[i],
                         &device_->joint_upper_limits[i],
@@ -155,6 +219,11 @@ bool IiwaHw::start() {
   this->registerInterface(&state_interface_);
   this->registerInterface(&effort_interface_);
   this->registerInterface(&position_interface_);
+  this->registerInterface(&position_interface_);
+  this->registerInterface(&pos_vel_interface_);
+  this->registerInterface(&pos_vel_eff_interface_);
+  
+
   
   return true;
 }
@@ -208,19 +277,20 @@ void IiwaHw::registerJointLimits(const std::string& joint_name,
   }
 }
 
-bool IiwaHw::read(ros::Duration period) {
+void IiwaHw::read(const ros::Time& time, const ros::Duration& period) {
   ros::Duration delta = ros::Time::now() - timer_;
   
   static bool was_connected = false;
-  
   if (iiwa_ros_conn_.getRobotIsConnected()) {
     
     iiwa_ros_conn_.getJointPosition(joint_position_);
-    iiwa_ros_conn_.getJointTorque(joint_torque_);
+    iiwa_ros_conn_.getJointVelocity(joint_velocity_);
+    iiwa_ros_conn_.getJointTorque  (joint_torque_  );
     
     device_->joint_position_prev = device_->joint_position;
     iiwaMsgsJointToVector(joint_position_.position, device_->joint_position);
-    iiwaMsgsJointToVector(joint_torque_.torque, device_->joint_effort);
+    iiwaMsgsJointToVector(joint_velocity_.velocity, device_->joint_velocity);
+    iiwaMsgsJointToVector(joint_torque_  .torque,   device_->joint_effort);
     
     // if there is no controller active the robot goes to zero position 
     if (!was_connected) {
@@ -230,22 +300,37 @@ bool IiwaHw::read(ros::Duration period) {
       was_connected = true;
     }
     
-    for (int j = 0; j < IIWA_JOINTS; j++)
-      device_->joint_velocity[j] = filters::exponentialSmoothing((device_->joint_position[j]-device_->joint_position_prev[j])/period.toSec(), 
-                                                                 device_->joint_velocity[j], 0.2);  
+    iiwa_ros_conn_.getCartesianWrench(device_->wrench_ee,'e');
+    iiwa_ros_conn_.getCartesianWrench(device_->wrench_b ,'b');
+    
+    if(wrench_ee_pub_->trylock())
+    {
+      device_->wrench_ee.header.frame_id = "iiwa_link_ee";    //TODO::as params
+      wrench_ee_pub_->msg_ = device_->wrench_ee;
+      wrench_ee_pub_->unlockAndPublish();
+    }
+    if(wrench_b_pub_->trylock())
+    {
+      device_->wrench_ee.header.frame_id = "iiwa_link_0";    //TODO::as params
+      wrench_b_pub_->msg_ = device_->wrench_b;
+      wrench_b_pub_->unlockAndPublish();
+    }
+    
+//     for (int j = 0; j < IIWA_JOINTS; j++)
+//       device_->joint_velocity[j] = filters::exponentialSmoothing((device_->joint_position[j]-device_->joint_position_prev[j])/period.toSec(), 
+//                                                                  device_->joint_velocity[j], 0.2);  
       
-      return 1;
   } else if (delta.toSec() >= 10) {
     ROS_INFO("No LBR IIWA is connected. Waiting for the robot to connect before reading ...");
     timer_ = ros::Time::now();
+    m_status = ::itia_hardware_interface::with_error;
   }
-  return 0;
 }
 
-bool IiwaHw::write(ros::Duration period) {
-  ej_sat_interface_.enforceLimits(period);
+void IiwaHw::write(const ros::Time& time, const ros::Duration& period) {
+  ej_sat_interface_   .enforceLimits(period);
   ej_limits_interface_.enforceLimits(period);
-  pj_sat_interface_.enforceLimits(period);
+  pj_sat_interface_   .enforceLimits(period);
   pj_limits_interface_.enforceLimits(period);
   
   ros::Duration delta = ros::Time::now() - timer_;
@@ -255,7 +340,6 @@ bool IiwaHw::write(ros::Duration period) {
     // Joint Position Control
     if (interface_ == interface_type_.at(0)) {
       if (device_->joint_position_command == last_joint_position_command_)  // avoid sending the same joint command over and over
-        return 0;
       
       last_joint_position_command_ = device_->joint_position_command;
       
@@ -275,7 +359,6 @@ bool IiwaHw::write(ros::Duration period) {
     }
     else if (interface_ == interface_type_.at(3)) {
       if (device_->joint_position_command == last_joint_position_command_)  // avoid sending the same joint command over and over
-        return 0;
       
       last_joint_position_command_ = device_->joint_position_command;
       
@@ -290,7 +373,8 @@ bool IiwaHw::write(ros::Duration period) {
   } else if (delta.toSec() >= 10) {
     ROS_INFO_STREAM("No LBR IIWA is connected. Waiting for the robot to connect before writing ...");
     timer_ = ros::Time::now();
+    m_status = ::itia_hardware_interface::with_error;
   }
   
-  return 0;
+}
 }

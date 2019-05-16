@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<launch>
+  <node pkg="nodelet" type="nodelet" name="manager"  args="manager" output="screen"> 
+    <param name="num_worker_threads" value="20" />
+  </node>
+  
+  <rosparam command="load" file="$(find iiwa_app)/config/test.yaml" />
+  <rosparam command="load" file="$(find iiwa_app)/config/iiwa_joint_1.yaml" />
+  <rosparam command="load" file="$(find iiwa_app)/config/iiwa_joint_2.yaml" />
+  <rosparam command="load" file="$(find iiwa_app)/config/iiwa_joint_3.yaml" />
+  <rosparam command="load" file="$(find iiwa_app)/config/iiwa_joint_4.yaml" />
+  <rosparam command="load" file="$(find iiwa_app)/config/iiwa_joint_5.yaml" />
+  <rosparam command="load" file="$(find iiwa_app)/config/iiwa_joint_6.yaml" />
+  <rosparam command="load" file="$(find iiwa_app)/config/iiwa_joint_7.yaml" />
+  
+  <rosparam command="load" file="$(find iiwa_app)/config/fri_config.yaml" />
+
+  <arg name="hardware_interface" default="PositionJointInterface"/>
+  <arg name="robot_name" default="iiwa"/>
+  <arg name="model" default="iiwa14"/>
+  
+  <rosparam command="load" file="$(find iiwa_hw)/config/joint_names.yaml" />
+  <param name="/iiwa/interface" value="$(arg hardware_interface)"/>
+  
+  <node pkg="itia_configuration_manager" type="configuration_manager" name="controller_manager" output="screen"/> 
+  <node pkg="itia_configuration_manager" type="configuration_user_interface" name="configuration_user_interface" output="screen"/> 
+  
+  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find iiwa_description)/urdf/iiwa14.urdf.xacro'"/>
+
+  <node pkg="robot_state_publisher" type="robot_state_publisher" name="iiwa_robot_state_publisher"/>
+  
+  <group ns="$(arg robot_name)">
+      <include file="$(find iiwa_moveit)/launch/move_group.launch">
+          <arg name="publish_monitored_planning_scene" value="true" />
+          <arg name="hardware_interface" value="$(arg hardware_interface)"/>
+          <arg name="robot_name" value="$(arg robot_name)"/>
+          <arg name="model" value="$(arg model)" />
+      </include>
+      
+      <include file="$(find iiwa_moveit)/launch/moveit_rviz.launch">
+          <arg name="config" value="true"/>
+      </include>
+  </group>
+  
+</launch>
+
