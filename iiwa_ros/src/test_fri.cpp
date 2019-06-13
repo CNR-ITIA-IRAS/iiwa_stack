@@ -18,7 +18,7 @@ int main(int argc, char* argv[] )
   Eigen::VectorXd twist_filt_dead_band(6);  twist_filt_dead_band << 0.005, 0.005, 0.005, 0.005, 0.005, 0.005;
   
   double dt = 0.005;
-  my_iiwa.init( dt, true );
+  my_iiwa.init( nh, dt, true );
       
   my_iiwa.getServoMotion().setFRIJointPositionControlMode(  );
   my_iiwa.startFriPublisher();

@@ -35,39 +35,42 @@ using namespace std;
 
 namespace iiwa_ros
 {
+
   
 ros::Time last_update_time;
 
 iiwaRos::iiwaRos() { }
 
-void iiwaRos::init (double fri_cycle_time, const bool verbosity)
+void iiwaRos::init (ros::NodeHandle &nh, double fri_cycle_time, const bool verbosity)
 {
-    dt_ = fri_cycle_time;
-    holder_state_pose_.init ( "state/CartesianPose" );
-    holder_state_joint_position_.init ( "state/JointPosition" );
-    holder_state_joint_torque_.init ( "state/JointTorque" );
-    holder_state_wrench_.init ( "state/CartesianWrench" );
-    holder_state_joint_stiffness_.init ( "state/JointStiffness" );
-    holder_state_joint_position_velocity_.init ( "state/JointPositionVelocity" );
-    holder_state_joint_damping_.init ( "state/JointDamping" );
-    holder_state_joint_velocity_.init ( "state/JointVelocity" );
-    holder_state_destination_reached_.init ( "state/DestinationReached" );
+  servo_motion_service_.reset(new iiwa_ros::ServoMotion(nh));
+  
+  dt_ = fri_cycle_time;
+  holder_state_pose_.init ( "state/CartesianPose" );
+  holder_state_joint_position_.init ( "state/JointPosition" );
+  holder_state_joint_torque_.init ( "state/JointTorque" );
+  holder_state_wrench_.init ( "state/CartesianWrench" );
+  holder_state_joint_stiffness_.init ( "state/JointStiffness" );
+  holder_state_joint_position_velocity_.init ( "state/JointPositionVelocity" );
+  holder_state_joint_damping_.init ( "state/JointDamping" );
+  holder_state_joint_velocity_.init ( "state/JointVelocity" );
+  holder_state_destination_reached_.init ( "state/DestinationReached" );
 
-    holder_command_pose_.init ( "command/CartesianPose" );
-    holder_command_payload_.init ( "command/Payload" );
-    holder_command_joint_position_.init ( "command/JointPosition" );
-    holder_command_joint_position_velocity_.init ( "command/JointPositionVelocity" );
-    holder_command_joint_velocity_.init ( "command/JointVelocity" );
+  holder_command_pose_.init ( "command/CartesianPose" );
+  holder_command_payload_.init ( "command/Payload" );
+  holder_command_joint_position_.init ( "command/JointPosition" );
+  holder_command_joint_position_velocity_.init ( "command/JointPositionVelocity" );
+  holder_command_joint_velocity_.init ( "command/JointVelocity" );
 
-    servo_motion_service_.setServiceName ( "configuration/configureSmartServo" );
-    path_parameters_service_.setServiceName ( "configuration/pathParameters" );
-    time_to_destination_service_.setServiceName ( "state/timeToDestination" );
-    
-    servo_motion_service_.setVerbosity(verbosity);
-    path_parameters_service_.setVerbosity(verbosity);
-    time_to_destination_service_.setVerbosity(verbosity);
+  servo_motion_service_->setServiceName ( "configuration/configureSmartServo" );
+  path_parameters_service_.setServiceName ( "configuration/pathParameters" );
+  time_to_destination_service_.setServiceName ( "state/timeToDestination" );
+  
+  servo_motion_service_->setVerbosity(verbosity);
+  path_parameters_service_.setVerbosity(verbosity);
+  time_to_destination_service_.setVerbosity(verbosity);
 
-    stop_fri_publisher_thread_ = false;
+  stop_fri_publisher_thread_ = false;
 
 }
 
@@ -174,19 +177,26 @@ void iiwaRos::stopFriPublisher()
 
 bool iiwaRos::getRobotIsConnected()
 {
+  if( !isFRIModalityActive() )
+  {
     ros::Duration diff = ( ros::Time::now() - last_update_time );
     return ( diff < ros::Duration ( 0.25 ) );
+  }
+  else
+  {
+    return true;
+  }
 }
 
 bool iiwaRos::isFRIModalityActive()
 {
-  int control_modality_active = servo_motion_service_.getControlModeActive();
+  int control_modality_active = servo_motion_service_->getControlModeActive();
   bool fri_modality_active    = ( control_modality_active == iiwa_msgs::ControlMode::FRI_JOINT_POS_CONTROL  )
                               || ( control_modality_active == iiwa_msgs::ControlMode::FRI_TORQUE_CONTROL    )
                               || ( control_modality_active == iiwa_msgs::ControlMode::FRI_JOINT_IMP_CONTROL );
 
   return fri_modality_active 
-      ||( servo_motion_service_.getFRIApp( ) != nullptr && servo_motion_service_.getFRIApp( )->isActive() );
+      ||( servo_motion_service_->getFRIApp( ) != nullptr && servo_motion_service_->getFRIApp( )->isActive() );
 
 }
 
@@ -198,7 +208,7 @@ bool iiwaRos::getJointPosition ( iiwa_msgs::JointPosition& value )
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().getJointPosition(value);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().getJointPosition(value);
   }
 }
 
@@ -214,7 +224,7 @@ bool iiwaRos::getJointPosition( Eigen::Vector7d& value )
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().getJointPosition(value);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().getJointPosition(value);
   }
 }
 
@@ -224,7 +234,7 @@ bool iiwaRos::getJointTorque ( iiwa_msgs::JointTorque& value )
     return holder_state_joint_torque_.get ( value );
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().getJointTorque(value);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().getJointTorque(value);
   }
 }
 
@@ -240,7 +250,7 @@ bool iiwaRos::getJointTorque ( Eigen::Vector7d& value )
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().getJointTorque(value);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().getJointTorque(value);
   }
 }
 
@@ -250,7 +260,7 @@ bool iiwaRos::getJointVelocity ( iiwa_msgs::JointVelocity& value )
     return holder_state_joint_velocity_.get ( value );
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().getJointVelocity (value);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().getJointVelocity (value);
   }
 }
 
@@ -266,7 +276,7 @@ bool iiwaRos::getJointVelocity ( Eigen::Vector7d& value )
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().getJointVelocity (value);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().getJointVelocity (value);
   }
 }
 
@@ -278,7 +288,7 @@ bool iiwaRos::getCartesianPose( geometry_msgs::PoseStamped& value ) {
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianPose(value);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().getCartesianPose(value);
   }
   return true;
 }
@@ -291,7 +301,7 @@ bool iiwaRos::getCartesianPose( Eigen::Affine3d& value ) {
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianPose(value);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().getCartesianPose(value);
   }
   return true;
 }
@@ -306,7 +316,7 @@ bool iiwaRos::getCartesianWrench (geometry_msgs::WrenchStamped& value, const cha
   }
   else
   {
-    ret = servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianWrench (value, what, filtered);
+    ret = servo_motion_service_->getFRIApp( )->getFRIClient().getCartesianWrench (value, what, filtered);
   }
 
   if(!ret)
@@ -392,7 +402,7 @@ bool iiwaRos::getCartesianTwist( geometry_msgs::TwistStamped& value, const char 
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianTwist(value, what, filtered);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().getCartesianTwist(value, what, filtered);
   }
   return true;
 }
@@ -406,7 +416,7 @@ bool iiwaRos::getCartesianTwist( Eigen::Vector6d& value, const char what, const 
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianTwist(value, what, filtered);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().getCartesianTwist(value, what, filtered);
   }
   return true;
 }
@@ -421,7 +431,7 @@ bool iiwaRos::getCartesianRotation   ( Eigen::Matrix3d&    R     )
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianRotation(R);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().getCartesianRotation(R);
   }
   return true;
 }
@@ -434,7 +444,7 @@ bool iiwaRos::getCartesianQuaternion ( Eigen::Quaterniond& quat  )
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianQuaternion(quat);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().getCartesianQuaternion(quat);
   }
   return true;
 }
@@ -448,7 +458,7 @@ bool iiwaRos::getCartesianPoint      ( Eigen::Vector3d&    point )
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().getCartesianPoint(point);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().getCartesianPoint(point);
   }
   return true;
 }
@@ -497,7 +507,7 @@ Eigen::Vector7d iiwaRos::toJointVelocity(const Eigen::Vector3d& velocity, const 
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().toJointVelocity(velocity, omega);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().toJointVelocity(velocity, omega);
   }
 }
 Eigen::Vector7d iiwaRos::toJointVelocity(const Eigen::VectorXd& q, const Eigen::Vector3d& velocity, const Eigen::Vector3d& omega)
@@ -510,7 +520,7 @@ Eigen::Vector7d iiwaRos::toJointVelocity(const Eigen::VectorXd& q, const Eigen::
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().toJointVelocity(q, velocity, omega);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().toJointVelocity(q, velocity, omega);
   }
 }
 bool iiwaRos::saturateVelocity(const Eigen::Vector7d& qd, Eigen::Vector7d& qd_saturated, double& scale )
@@ -523,7 +533,7 @@ bool iiwaRos::saturateVelocity(const Eigen::Vector7d& qd, Eigen::Vector7d& qd_sa
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().saturateVelocity(qd, qd_saturated, scale );
+    return servo_motion_service_->getFRIApp( )->getFRIClient().saturateVelocity(qd, qd_saturated, scale );
   }
 }
 
@@ -537,7 +547,7 @@ bool iiwaRos::saturateVelocity(const Eigen::Vector7d& qd, const Eigen::Vector7d&
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().saturateVelocity(qd, qd_max, qd_saturated, scale );
+    return servo_motion_service_->getFRIApp( )->getFRIClient().saturateVelocity(qd, qd_max, qd_saturated, scale );
   }
 }
 
@@ -553,7 +563,7 @@ Eigen::Vector6d iiwaRos::toCartsianTwist(const Eigen::Vector7d& qd)
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().toCartsianTwist(qd);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().toCartsianTwist(qd);
   }
 }
 Eigen::Vector6d iiwaRos::toCartsianTwist(const Eigen::VectorXd& q, const Eigen::Vector7d& qd)
@@ -566,7 +576,7 @@ Eigen::Vector6d iiwaRos::toCartsianTwist(const Eigen::VectorXd& q, const Eigen::
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().toCartsianTwist(q, qd);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().toCartsianTwist(q, qd);
   }
 }
 
@@ -579,7 +589,7 @@ bool iiwaRos::getJacobian(Eigen::Matrix67d& value)
   }
   else
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().getJacobian (value);
+    return servo_motion_service_->getFRIApp( )->getFRIClient().getJacobian (value);
   }
 }
 
@@ -596,7 +606,7 @@ bool iiwaRos::getJointDamping ( iiwa_msgs::JointDamping& value )
 void iiwaRos::setCartesianPose ( const geometry_msgs::PoseStamped& position )
 {
 #if defined( ENABLE_FRI )
-  int control_modality_active = servo_motion_service_.getControlModeActive();
+  int control_modality_active = servo_motion_service_->getControlModeActive();
   if(( control_modality_active == 5 )
   || ( control_modality_active == 6 )
   || ( control_modality_active == 7 )
@@ -619,7 +629,7 @@ void iiwaRos::setCartesianPose ( const geometry_msgs::PoseStamped& position )
 void iiwaRos::setPayload ( const geometry_msgs::PoseStamped& position )
 {
 #if defined( ENABLE_FRI )
-  int control_modality_active = servo_motion_service_.getControlModeActive();
+  int control_modality_active = servo_motion_service_->getControlModeActive();
   if(( control_modality_active == 5 )
   || ( control_modality_active == 6 )
   || ( control_modality_active == 7 )
@@ -648,9 +658,9 @@ void iiwaRos::setPayload ( const geometry_msgs::PoseStamped& position )
 void iiwaRos::setJointTorque ( const iiwa_msgs::JointTorque& torque )
 {
 #if defined( ENABLE_FRI )
-  if( ( servo_motion_service_.getControlModeActive() == 6 ) )
+  if( ( servo_motion_service_->getControlModeActive() == 6 ) )
   {
-    servo_motion_service_.getFRIApp( )->getFRIClient().newJointTorqueCommand( torque );
+    servo_motion_service_->getFRIApp( )->getFRIClient().newJointTorqueCommand( torque );
   }
   else
   {
@@ -666,9 +676,9 @@ void iiwaRos::setJointTorque ( const iiwa_msgs::JointTorque& torque )
 void iiwaRos::setWrench ( const iiwa_msgs::CartesianQuantity& wrench )
 {
 #if defined( ENABLE_FRI )
-  if( ( servo_motion_service_.getControlModeActive() == 8 ) )
+  if( ( servo_motion_service_->getControlModeActive() == 8 ) )
   {
-    servo_motion_service_.getFRIApp( )->getFRIClient().newWrenchCommand( wrench );
+    servo_motion_service_->getFRIApp( )->getFRIClient().newWrenchCommand( wrench );
   }
   else
   {
@@ -687,7 +697,7 @@ bool iiwaRos::setJointPosition ( const iiwa_msgs::JointPosition& position )
 #if defined( ENABLE_FRI )
   if( isFRIModalityActive() )
   {
-    return servo_motion_service_.getFRIApp( )->getFRIClient().newJointPosCommand( position );
+    return servo_motion_service_->getFRIApp( )->getFRIClient().newJointPosCommand( position );
   }
   else
   {
@@ -705,7 +715,7 @@ bool iiwaRos::setJointPosition ( const iiwa_msgs::JointPosition& position )
 void iiwaRos::setJointVelocity ( const iiwa_msgs::JointVelocity& velocity )
 {
 #if defined( ENABLE_FRI )
-  int control_modality_active = servo_motion_service_.getControlModeActive();
+  int control_modality_active = servo_motion_service_->getControlModeActive();
   if( ( control_modality_active == 5 )
   ||  ( control_modality_active == 6 ) 
   ||  ( control_modality_active == 7 ) )
@@ -849,7 +859,7 @@ bool iiwaRos::setWrenchOffset(const double estimation_time)
 void iiwaRos::setJointPositionVelocity ( const iiwa_msgs::JointPositionVelocity& value )
 {
 #if defined( ENABLE_FRI )
-  int control_modality_active = servo_motion_service_.getControlModeActive();
+  int control_modality_active = servo_motion_service_->getControlModeActive();
   if( ( control_modality_active == 5 )
   ||  ( control_modality_active == 6 ) 
   ||  ( control_modality_active == 7 ) )

@@ -178,7 +178,7 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
 
   public:
   
-    LBRJointOverlayClient ( const size_t target_queue_lenght = 1e2 );
+    LBRJointOverlayClient ( ros::NodeHandle& nh, const size_t target_queue_lenght = 1e2 );
     ~LBRJointOverlayClient( );
     
     virtual void onStateChange(KUKA::FRI::ESessionState oldState, KUKA::FRI::ESessionState newState);
@@ -238,6 +238,7 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
     bool saturateVelocity(const Eigen::Vector7d& qd, const Eigen::Vector7d& qd_max, Eigen::Vector7d& qd_saturated, double& scale ) const;
   private:
 
+    ros::NodeHandle nh_;
     std::thread logger;
     void loggerThread();
     int line_;
@@ -289,7 +290,7 @@ class LBROverlayApp
 public:
   
   
-  LBROverlayApp( );
+  LBROverlayApp(ros::NodeHandle &nh );
     
   ~LBROverlayApp( );
 
@@ -302,6 +303,7 @@ public:
 private:
   
   void step();
+  ros::NodeHandle nh_;
   
   bool                                            active_;
   bool                                            stop_fri_command_thread_;

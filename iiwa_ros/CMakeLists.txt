@@ -13,6 +13,8 @@ if( ENABLE_FRI )
   SET( KUKA_FRI_INCLUDE  /usr/local/include )
 endif()
 
+find_package (Eigen3 3.3 REQUIRED)
+
 find_package(catkin REQUIRED COMPONENTS
   iiwa_msgs
   roscpp
@@ -49,6 +51,7 @@ add_library(${PROJECT_NAME}
   src/time_to_destination_service.cpp
   src/fri_client.cpp
 )
+target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME} orocos-kdl ${KUKA_FRI_LIBRARIES} ${catkin_LIBRARIES} ${EIGEN3_LIBRARIES} ${Boost_LIBRARIES})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

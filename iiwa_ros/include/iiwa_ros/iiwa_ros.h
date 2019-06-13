@@ -164,7 +164,8 @@ namespace iiwa_ros
      * 
      * @return void
      */
-    void init ( double fri_cycle_time
+    void init ( ros::NodeHandle &nh
+              , double fri_cycle_time
               , const bool verbosity = false );
     
     bool estimatePayload(const double estimation_time = 5, const double toll = 0.005);
@@ -260,7 +261,7 @@ namespace iiwa_ros
      * 
      * @return iiwa_ros::ServoMotion
      */
-    ServoMotion& getServoMotion() { return servo_motion_service_; }
+    ServoMotion& getServoMotion() { return * servo_motion_service_; }
     
     /**
      * @brief Returns the object that allows to call the timeToDestination service.
@@ -339,7 +340,7 @@ namespace iiwa_ros
     iiwaCommandHolder<iiwa_msgs::JointVelocity> holder_command_joint_velocity_;
     iiwaCommandHolder<iiwa_msgs::JointPositionVelocity> holder_command_joint_position_velocity_;
     
-    ServoMotion servo_motion_service_;
+    std::shared_ptr< ServoMotion > servo_motion_service_;
     PathParametersService path_parameters_service_;
     TimeToDestinationService time_to_destination_service_;
     struct Payload

@@ -29,14 +29,14 @@
 namespace iiwa_ros
 {
 
-ServoMotion::ServoMotion() : iiwaServices<iiwa_msgs::ConfigureSmartServo>() {}
+ServoMotion::ServoMotion(ros::NodeHandle &nh) : iiwaServices<iiwa_msgs::ConfigureSmartServo>() , nh_(nh) {}
 ServoMotion::~ServoMotion() 
 {
   ROS_INFO("Destroy the ServoMotion");
   setPositionControlMode();
 }
 
-ServoMotion::ServoMotion ( const std::string& service_name, const bool verbose ) : iiwaServices<iiwa_msgs::ConfigureSmartServo> ( service_name, verbose ) {}
+ServoMotion::ServoMotion ( ros::NodeHandle &nh, const std::string& service_name, const bool verbose ) : iiwaServices<iiwa_msgs::ConfigureSmartServo> ( service_name, verbose ) , nh_(nh) {}
 
 bool ServoMotion::callService()
 {
@@ -122,7 +122,7 @@ bool ServoMotion::setFRIJointPositionControlMode( )
     ros::Duration(0.5).sleep();
   */
     if( fri_app_ == nullptr )
-      fri_app_.reset( new iiwa_ros::LBROverlayApp(  )  );
+      fri_app_.reset( new iiwa_ros::LBROverlayApp( nh_ )  );
     //config_.request.control_mode = 5;
     return true ; // callService();
 #else
@@ -142,7 +142,7 @@ bool ServoMotion::setFRIJointImpedanceControlMode(const iiwa_msgs::JointQuantity
     }
     ros::Duration(0.5).sleep();
     if( fri_app_ == nullptr )
-      fri_app_.reset( new iiwa_ros::LBROverlayApp(  )  );
+      fri_app_.reset( new iiwa_ros::LBROverlayApp( nh_ )  );
     config_.request.control_mode = 7;
     return callService();
 #else
@@ -161,7 +161,7 @@ bool ServoMotion::setFRIJointTorqueControlMode(const iiwa_msgs::JointQuantity& j
     }
     ros::Duration(0.5).sleep();
     if( fri_app_ == nullptr )
-      fri_app_.reset( new iiwa_ros::LBROverlayApp(  )  );
+      fri_app_.reset( new iiwa_ros::LBROverlayApp( nh_ )  );
     config_.request.control_mode = 6;
     return callService();
 #else
@@ -180,7 +180,7 @@ bool ServoMotion::setFRIWrenchControlMode(const iiwa_msgs::CartesianQuantity& ca
 //     }
     ros::Duration(0.5).sleep();
     if( fri_app_ == nullptr )
-      fri_app_.reset( new iiwa_ros::LBROverlayApp(  )  );
+      fri_app_.reset( new iiwa_ros::LBROverlayApp( nh_ )  );
     config_.request.control_mode = 8;
     return callService();
 #else

@@ -39,7 +39,7 @@
 
 namespace iiwa_ros 
 {
-LBRJointOverlayClient::LBRJointOverlayClient(const size_t target_queue_lenght )
+LBRJointOverlayClient::LBRJointOverlayClient(ros::NodeHandle& nh, const size_t target_queue_lenght )
   : command_joint_position_      ( target_queue_lenght )
   , command_joint_torque_        ( target_queue_lenght )
   , command_wrench_              ( target_queue_lenght )
@@ -51,22 +51,21 @@ LBRJointOverlayClient::LBRJointOverlayClient(const size_t target_queue_lenght )
   , initial_wrench_              ( 6, 0.0 )
   , control_running_             ( false )
   , update_time_                 (ros::Time::now())
+  , nh_                          ( nh )
 {
 
-  realtime_pub_.init( ros::NodeHandle("~"), "fri", 100);
-
-  ros::NodeHandle nh("~");
+  realtime_pub_.init( nh_, "fri", 100);
 
   std::string robot_description   ;
   std::string robot_link_base     ;
   std::string robot_tool_base     ;
 
-  if( !nh.getParam( ROBOT_DESCRIPTION_NS , robot_description ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), ROBOT_DESCRIPTION_NS .c_str()); throw std::runtime_error("Abort."); }
-  if( !nh.getParam( ROBOT_LINK_BASE_NS   , robot_link_base   ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), ROBOT_LINK_BASE_NS   .c_str()); throw std::runtime_error("Abort."); }
-  if( !nh.getParam( ROBOT_TOOL_BASE_NS   , robot_tool_base   ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), ROBOT_TOOL_BASE_NS   .c_str()); throw std::runtime_error("Abort."); }
+  if( !nh_.getParam( ROBOT_DESCRIPTION_NS , robot_description ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh_.getNamespace().c_str(), ROBOT_DESCRIPTION_NS .c_str()); throw std::runtime_error("Abort."); }
+  if( !nh_.getParam( ROBOT_LINK_BASE_NS   , robot_link_base   ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh_.getNamespace().c_str(), ROBOT_LINK_BASE_NS   .c_str()); throw std::runtime_error("Abort."); }
+  if( !nh_.getParam( ROBOT_TOOL_BASE_NS   , robot_tool_base   ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh_.getNamespace().c_str(), ROBOT_TOOL_BASE_NS   .c_str()); throw std::runtime_error("Abort."); }
 
   std::string robot_desc_string;
-  nh.param(robot_description, robot_desc_string, std::string());
+  nh_.param(robot_description, robot_desc_string, std::string());
   if (!kdl_parser::treeFromString(robot_desc_string, iiwa_tree_))
   {
      ROS_ERROR("Failed to construct kdl tree");
@@ -88,18 +87,18 @@ LBRJointOverlayClient::LBRJointOverlayClient(const size_t target_queue_lenght )
   std::vector<double> twist_saturation;
   double              twist_freq_hz;
 
-  if( !nh.getParam( WRENCH_FILTER_SATURATION_NS, wrench_saturation ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), WRENCH_FILTER_SATURATION_NS.c_str()); throw std::runtime_error("Abort."); }
-  if( !nh.getParam( WRENCH_FILTER_DEADBAND_NS  , wrench_deadband   ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), WRENCH_FILTER_DEADBAND_NS  .c_str()); throw std::runtime_error("Abort."); }
-  if( !nh.getParam( WRENCH_FILTER_FREQUENCY_NS , wrench_freq_hz    ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), WRENCH_FILTER_FREQUENCY_NS .c_str()); throw std::runtime_error("Abort."); }
+  if( !nh_.getParam( WRENCH_FILTER_SATURATION_NS, wrench_saturation ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh_.getNamespace().c_str(), WRENCH_FILTER_SATURATION_NS.c_str()); throw std::runtime_error("Abort."); }
+  if( !nh_.getParam( WRENCH_FILTER_DEADBAND_NS  , wrench_deadband   ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh_.getNamespace().c_str(), WRENCH_FILTER_DEADBAND_NS  .c_str()); throw std::runtime_error("Abort."); }
+  if( !nh_.getParam( WRENCH_FILTER_FREQUENCY_NS , wrench_freq_hz    ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh_.getNamespace().c_str(), WRENCH_FILTER_FREQUENCY_NS .c_str()); throw std::runtime_error("Abort."); }
 
-  if( !nh.getParam( TWIST_FILTER_SATURATION_NS, twist_saturation   ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), TWIST_FILTER_SATURATION_NS.c_str()) ; throw std::runtime_error("Abort."); }
-  if( !nh.getParam( TWIST_FILTER_DEADBAND_NS  , twist_deadband     ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), TWIST_FILTER_DEADBAND_NS  .c_str()) ; throw std::runtime_error("Abort."); }
-  if( !nh.getParam( TWIST_FILTER_FREQUENCY_NS , twist_freq_hz      ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), TWIST_FILTER_FREQUENCY_NS .c_str()) ; throw std::runtime_error("Abort."); }
+  if( !nh_.getParam( TWIST_FILTER_SATURATION_NS, twist_saturation   ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh_.getNamespace().c_str(), TWIST_FILTER_SATURATION_NS.c_str()) ; throw std::runtime_error("Abort."); }
+  if( !nh_.getParam( TWIST_FILTER_DEADBAND_NS  , twist_deadband     ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh_.getNamespace().c_str(), TWIST_FILTER_DEADBAND_NS  .c_str()) ; throw std::runtime_error("Abort."); }
+  if( !nh_.getParam( TWIST_FILTER_FREQUENCY_NS , twist_freq_hz      ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh_.getNamespace().c_str(), TWIST_FILTER_FREQUENCY_NS .c_str()) ; throw std::runtime_error("Abort."); }
 
-  if( !nh.getParam( FRI_CYCLE_TIME_S_NS       , fri_cycle_time_s_   ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), FRI_CYCLE_TIME_S_NS .c_str()) ; throw std::runtime_error("Abort."); }
+  if( !nh_.getParam( FRI_CYCLE_TIME_S_NS       , fri_cycle_time_s_   ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh_.getNamespace().c_str(), FRI_CYCLE_TIME_S_NS .c_str()) ; throw std::runtime_error("Abort."); }
 
   std::vector<double> max_joint_velocity_allowed;
-  if( !nh.getParam( MAX_JOINT_VELOCITY_ALLOWED_NS, max_joint_velocity_allowed ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), MAX_JOINT_VELOCITY_ALLOWED_NS.c_str()) ; throw std::runtime_error("Abort."); }
+  if( !nh_.getParam( MAX_JOINT_VELOCITY_ALLOWED_NS, max_joint_velocity_allowed ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh_.getNamespace().c_str(), MAX_JOINT_VELOCITY_ALLOWED_NS.c_str()) ; throw std::runtime_error("Abort."); }
 
 
   double w_natural_frequency = wrench_freq_hz * 2 * M_PI ; // [rad/s]
@@ -252,7 +251,7 @@ void LBRJointOverlayClient::loggerThread()
 {
 
   ros::NodeHandle nh("~");
-  ros::Publisher logger_pub = nh.advertise<std_msgs::Float32MultiArray>("iiwa_line_logger", 10000);
+  ros::Publisher logger_pub = nh_.advertise<std_msgs::Float32MultiArray>("iiwa_line_logger", 10000);
   while( ros::ok() )
   {
     std_msgs::Float32MultiArray data_log;
@@ -748,14 +747,13 @@ bool LBRJointOverlayClient::isControlRunning( ) const { return control_running_;
  * @param chain_root
  * @param chain_tip
  */
-LBROverlayApp::LBROverlayApp()
-: active_    ( false )
+LBROverlayApp::LBROverlayApp(ros::NodeHandle &nh)
+: active_    ( false ), nh_(nh), client_(nh)
 {
 
-  ros::NodeHandle nh("~");
-  if( !nh.getParam( FRI_PORT_NS          , fri_port_        ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), FRI_PORT_NS          .c_str()); throw std::runtime_error("Abort."); }
-  if( !nh.getParam( FRI_HOSTNAME_NS      , fri_hostname_    ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), FRI_HOSTNAME_NS      .c_str()); throw std::runtime_error("Abort."); }
-  if( !nh.getParam( FRI_TIMEOUT_MS_NS    , fri_timeout_ms_  ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh.getNamespace().c_str(), FRI_TIMEOUT_MS_NS    .c_str()); throw std::runtime_error("Abort."); }
+  if( !nh_.getParam( FRI_PORT_NS          , fri_port_        ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh_.getNamespace().c_str(), FRI_PORT_NS          .c_str()); throw std::runtime_error("Abort."); }
+  if( !nh_.getParam( FRI_HOSTNAME_NS      , fri_hostname_    ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh_.getNamespace().c_str(), FRI_HOSTNAME_NS      .c_str()); throw std::runtime_error("Abort."); }
+  if( !nh_.getParam( FRI_TIMEOUT_MS_NS    , fri_timeout_ms_  ) ) { ROS_ERROR("Param %s/%s not in param server. Abort. ", nh_.getNamespace().c_str(), FRI_TIMEOUT_MS_NS    .c_str()); throw std::runtime_error("Abort."); }
 
   connection_.reset( new KUKA::FRI::UdpConnection( (unsigned int)fri_timeout_ms_ ) );
   connect();
@@ -820,8 +818,8 @@ void LBROverlayApp::step()
       {
         case KUKA::FRI::POOR      : ROS_FATAL_THROTTLE(5, "** POOR ** FRI COMMUNICATION STATE     " ); break;
         case KUKA::FRI::FAIR      : ROS_WARN_THROTTLE (5, "** FAIR ** FRI COMMUNICATION STATE     " ); break;
-        case KUKA::FRI::GOOD      : ROS_WARN_THROTTLE (5, "** GOOD ** FRI COMMUNICATION STATE     " ); break;
-        case KUKA::FRI::EXCELLENT : ROS_INFO_THROTTLE (5, "** EXCELLENT** FRI COMMUNICATION STATE " ); break;
+//         case KUKA::FRI::GOOD      : ROS_WARN_THROTTLE (5, "** GOOD ** FRI COMMUNICATION STATE     " ); break;
+//         case KUKA::FRI::EXCELLENT : ROS_INFO_THROTTLE (5, "** EXCELLENT** FRI COMMUNICATION STATE " ); break;
       }
 
       KUKA::FRI::ESessionState oldState, newState;

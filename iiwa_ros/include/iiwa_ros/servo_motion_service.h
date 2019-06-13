@@ -45,7 +45,7 @@ class ServoMotion : public iiwaServices<iiwa_msgs::ConfigureSmartServo>
 public:
 
 
-    ServoMotion();
+    ServoMotion(ros::NodeHandle &nh);
     ~ServoMotion();
 
     /**
@@ -54,7 +54,7 @@ public:
      * @param service_name Name of the ROS Service server to connect to.
      * @param verbose If true some ROS_INFO messages will be printed out during service calls.
      */
-    ServoMotion ( const std::string& service_name, const bool verbose = true );
+    ServoMotion ( ros::NodeHandle &nh, const std::string& service_name, const bool verbose = true );
 
 #if defined( ENABLE_FRI )
     
@@ -248,6 +248,8 @@ public:
     
 protected:
     virtual bool callService();
+    
+    ros::NodeHandle & nh_;
 
     void initCartesianLimits ( const iiwa_msgs::CartesianQuantity& max_path_deviation, const iiwa_msgs::CartesianQuantity& max_cartesian_velocity,
                                const iiwa_msgs::CartesianQuantity& max_control_force, const bool max_control_force_stop );
