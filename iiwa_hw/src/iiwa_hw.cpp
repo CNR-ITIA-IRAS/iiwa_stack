@@ -57,6 +57,7 @@ IiwaHw::~IiwaHw()
 
 bool IiwaHw::prepareSwitch(const std::list< hardware_interface::ControllerInfo >& start_list, const std::list< hardware_interface::ControllerInfo >& stop_list)
 {
+  iiwa_ros_conn_.setWrenchOffset(1);
   return true;
 }
 

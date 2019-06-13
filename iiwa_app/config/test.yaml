@@ -38,6 +38,37 @@ control_configurations:
         hardware_interface: "iiwa"
         controller        : "js_pub"
     
+  - name: "joint_teleop"
+    components:
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "joint_teleop_ctrl"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "js_pub"
+
+  - name: "cart_teleop"
+    components:
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "cart_teleop_ctrl"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "js_pub"
+        
+  - name: "touch"
+    components:
+      - description: ""
+        hardware_interface: "twist_hi"
+        controller        : "touch_control"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "cart_teleop_ctrl"
+      - description: ""
+        hardware_interface: "iiwa"
+        controller        : "js_pub"
+
+
   - name: "teleop_impedance"
     components:
       - description: ""
@@ -50,16 +81,6 @@ control_configurations:
         hardware_interface: "iiwa"
         controller        : "js_pub"
         
-  - name: "teleop"
-    components:
-      - description: ""
-        hardware_interface: "iiwa"
-        controller        : "joint_teleop_ctrl"
-      - description: ""
-        hardware_interface: "iiwa"
-        controller        : "js_pub"
-
-
         
 planner_joint_impedance_hi:
   type: "itia/control/TopicHwIfaceNodelet"
@@ -79,12 +100,14 @@ planner_joint_impedance_hi:
   - "/planner_joint_impedance_hi/thor/follow_joint_trajectory/goal"
   - "/planner_joint_impedance_hi/thor/follow_joint_trajectory/result"
   - "/planner_joint_impedance_hi/thor/follow_joint_trajectory/status"
+  - "/twist_hi/touch_control/robot_description"
   remap_target_args: 
   - "/iiwa/thor_prefilter_controller/follow_joint_trajectory/cancel"
   - "/iiwa/thor_prefilter_controller/follow_joint_trajectory/feedback"
   - "/iiwa/thor_prefilter_controller/follow_joint_trajectory/goal"
   - "/iiwa/thor_prefilter_controller/follow_joint_trajectory/result"
   - "/iiwa/thor_prefilter_controller/follow_joint_trajectory/status"
+  - "/robot_description"
   
   thor:
     type: "thor/PrefilterPosController"
@@ -93,9 +116,31 @@ planner_joint_impedance_hi:
     
   joint_teleop_ctrl:
     type: "itia/control/JointTeleopController"
-    controlled_joint: [iiwa_joint_1,iiwa_joint_2,iiwa_joint_3,iiwa_joint_4,iiwa_joint_5,iiwa_joint_6,iiwa_joint_7]
+    controlled_joints: [iiwa_joint_1,iiwa_joint_2,iiwa_joint_3,iiwa_joint_4,iiwa_joint_5,iiwa_joint_6,iiwa_joint_7]
     
     
+twist_hi:
+  type: "itia/control/TopicHwIfaceNodelet"
+  
+  joint_names: [iiwa_joint_1,iiwa_joint_2,iiwa_joint_3,iiwa_joint_4,iiwa_joint_5,iiwa_joint_6,iiwa_joint_7]
+  allowed_controller_types:
+  - "controller_type1"
+  feedback_joint_state_topic  : "/iiwa/joint_states"
+  command_joint_state_topic   : "/iiwa/touch_control/target_cart_teleop"
+  sampling_period             : 0.005
+  diagnostic_period           : 0.1
+  feedback_joint_state_timeout: 20
+  
+  touch_control:
+    type              : "itia/control/SimpleTouchController"
+    controlled_joints : [iiwa_joint_1,iiwa_joint_2,iiwa_joint_3,iiwa_joint_4,iiwa_joint_5,iiwa_joint_6,iiwa_joint_7]
+    base_link         : "iiwa_link_0"
+    tool_link         : "iiwa_link_ee"
+    sensor_frame      : "iiwa_link_ee"
+    wrench_topic_name : "/wrench_tool"
+    target_wrench     : [0,0,-10,0,0,0]
+    wrench_toll       : [1,1,1,1,1,1]
+
 
 
 iiwa:
@@ -139,16 +184,14 @@ iiwa:
   - "/iiwa/thor_prefilter_planner/follow_joint_trajectory/goal"
   - "/iiwa/thor_prefilter_planner/follow_joint_trajectory/result"
   - "/iiwa/thor_prefilter_planner/follow_joint_trajectory/status"
-  - "/iiwa/bracket_teleop_ctrl/target_cart_teleop"
-  - "/iiwa/flange_teleop_ctrl/target_cart_teleop"
+  - "/iiwa/cart_teleop_ctrl/target_cart_teleop"
   remap_target_args: 
   - "/iiwa/thor_prefilter_controller/follow_joint_trajectory/cancel"
   - "/iiwa/thor_prefilter_controller/follow_joint_trajectory/feedback"
   - "/iiwa/thor_prefilter_controller/follow_joint_trajectory/goal"
   - "/iiwa/thor_prefilter_controller/follow_joint_trajectory/result"
   - "/iiwa/thor_prefilter_controller/follow_joint_trajectory/status"
-  - "/teleop_twist"
-  - "/teleop_twist"
+  - "/iiwa/touch_control/target_cart_twist"
 
   thor_prefilter_planner:
     type: "thor/PrefilterPosController"
@@ -175,14 +218,20 @@ iiwa:
     sensor_frame          : "iiwa_link_ee"
     
   joint_teleop_ctrl:
-    type            : "itia/control/JointTeleopController"
-    controlled_joint: [iiwa_joint_1,iiwa_joint_2,iiwa_joint_3,iiwa_joint_4,iiwa_joint_5,iiwa_joint_6,iiwa_joint_7]
+    type             : "itia/control/JointTeleopController"
+    controlled_joints: [iiwa_joint_1,iiwa_joint_2,iiwa_joint_3,iiwa_joint_4,iiwa_joint_5,iiwa_joint_6,iiwa_joint_7]
+    
+  cart_teleop_ctrl:
+    type            : "itia/control/CartTeleopController"
+    controlled_joints: [iiwa_joint_1,iiwa_joint_2,iiwa_joint_3,iiwa_joint_4,iiwa_joint_5,iiwa_joint_6,iiwa_joint_7]
+    base_link       : "iiwa_link_0"
+    tool_link       : "iiwa_link_ee"
     
   cartesian_impedance_ctrl:
       # REQUIRED:
     type                  : "itia/control/CartImpedanceController"
     inertia               : [ 10, 10, 10,  10, 10, 10]    
-    stiffness             : [500,500,500, 500,500,500]   
+    stiffness             : [500,500,500, 50,50,50]   
     damping               : [120,120,120, 120,120,120]   
     joint_target_topic    : "/joint_impedance_pos_target"
     base_frame            : "iiwa_link_0"
@@ -194,7 +243,7 @@ iiwa:
     wrench_deadband       : [1,1,1,1,1,1] 
     external_wrench_topic : "/wrench_tool"
     controlled_joint      : [iiwa_joint_1,iiwa_joint_2,iiwa_joint_3,iiwa_joint_4,iiwa_joint_5,iiwa_joint_6,iiwa_joint_7]
-    damping_ratio         : [0.9,0.9,0.9,0.9,0.9,0.9]               
+    damping_ratio         : [2,2,2,1.2,1.2,1.2]               
 
     
     

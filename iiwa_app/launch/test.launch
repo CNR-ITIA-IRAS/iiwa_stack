@@ -4,10 +4,10 @@
     <param name="num_worker_threads" value="20" />
   </node>
   
-<!--   <rosparam command="load" file="$(find iiwa_app)/config/test.yaml" /> -->
-  <rosparam command="load" file="$(find iiwa_app)/config/configurations.yaml" />
+  <rosparam command="load" file="$(find iiwa_app)/config/test.yaml" />
+<!--  <rosparam command="load" file="$(find iiwa_app)/config/configurations.yaml" />
   <rosparam command="load" file="$(find iiwa_app)/config/iiwa_hi.yaml" />
-  <rosparam command="load" file="$(find iiwa_app)/config/planner_joint_impedance_hi.yaml" />
+  <rosparam command="load" file="$(find iiwa_app)/config/planner_joint_impedance_hi.yaml" />-->
 
   <arg name="hardware_interface" default="PositionJointInterface"/>
   <arg name="robot_name" default="iiwa"/>
