@@ -296,8 +296,12 @@ void IiwaHw::read(const ros::Time& time, const ros::Duration& period) {
     // if there is no controller active the robot goes to zero position 
     if (!was_connected) {
       for (int j = 0; j < IIWA_JOINTS; j++)
-        device_->joint_position_command[j] = device_->joint_position[j];
-      
+      {
+        if(!std::isnan(device_->joint_position[j]))
+          device_->joint_position_command[j] = device_->joint_position[j];
+        else
+          ROS_WARN_STREAM("joint " << j <<"is NAN");
+      }
       was_connected = true;
     }
     
