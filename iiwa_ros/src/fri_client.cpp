@@ -493,7 +493,7 @@ bool LBRJointOverlayClient::getJacobian(const Eigen::Vector7d q, Eigen::Matrix67
 
   if( KUKA::FRI::LBRState::NUMBER_OF_JOINTS != iiwa_chain_.getNrOfJoints() )
   {
-	  ROS_ERROR_THROTTLE("The KDL chain is broken");
+	  ROS_ERROR_THROTTLE(0.5, "The KDL chain is broken");
 	  return false;
   }
   
@@ -503,7 +503,7 @@ bool LBRJointOverlayClient::getJacobian(const Eigen::Vector7d q, Eigen::Matrix67
 
   if( (jac.columns() != KUKA::FRI::LBRState::NUMBER_OF_JOINTS ) || ( jac.rows() != 6 ) )
   {
-	  ROS_ERROR_THROTTLE("The KDL jacobian solver is broken");
+	  ROS_ERROR_THROTTLE(0.5, "The KDL jacobian solver is broken");
 	  return false;
   }
   
@@ -644,7 +644,7 @@ Eigen::Vector7d LBRJointOverlayClient::toJointVelocity(const Eigen::Vector7d& q,
 
 Eigen::Vector6d LBRJointOverlayClient::toCartsianTwist(const Eigen::Vector7d& qd)
 {
-  Eigen::Vector6d  ret = Eigen::Vector6d::Zero()
+  Eigen::Vector6d  ret = Eigen::Vector6d::Zero();
   
   Eigen::Matrix67d jac;
   if( getJacobian(jac) )
