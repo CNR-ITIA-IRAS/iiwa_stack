@@ -279,6 +279,7 @@ class LBRJointOverlayClient : public KUKA::FRI::LBRClient
     Eigen::Vector7d   joint_velocity_;
     Eigen::Vector7d   max_joint_velocity_;
     Eigen::Matrix67d  jacobian_;
+    bool              jacobian_last_ok_;
 
     double fri_cycle_time_s_;
     ros::Time update_time_;

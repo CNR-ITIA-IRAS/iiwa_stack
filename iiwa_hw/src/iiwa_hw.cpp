@@ -213,19 +213,18 @@ bool IiwaHw::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw_nh)
                         &device_->joint_effort_limits[i]);
   }
   
-  ROS_INFO("Register state and effort interfaces");
-  
-  // TODO: CHECK
-  // register ros-controls interfaces
+  ROS_INFO("Register state interface");
   this->registerInterface(&state_interface_);
+  ROS_INFO("Register effort interface");
   this->registerInterface(&effort_interface_);
+  ROS_INFO("Register position interface");
   this->registerInterface(&position_interface_);
-  this->registerInterface(&position_interface_);
+  // this->registerInterface(&position_interface_);
+  ROS_INFO("Register position velocity interface");
   this->registerInterface(&pos_vel_interface_);
+  ROS_INFO("Register position velocity effort interface");
   this->registerInterface(&pos_vel_eff_interface_);
-  
-
-  
+    
   return true;
 }
 
