@@ -53,7 +53,7 @@
   <exec_depend>sensor_msgs</exec_depend>
 
   <depend>iiwa_msgs</depend>
-  <depend>itia_ros</depend>
+  <depend>iiwa_ros</depend>
   <depend>eigen_state_space_systems</depend>
   
   <!-- The export tag contains other, unspecified, tags -->
