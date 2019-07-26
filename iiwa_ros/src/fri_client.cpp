@@ -701,7 +701,12 @@ bool LBRJointOverlayClient::updatetFirstOrderKinematic( )
   //////// POSE
   KDL::Frame      fr;
   unsigned int    nj = iiwa_tree_.getNrOfJoints();
-  KDL::JntArray   ja = KDL::JntArray(nj);
+  if( nj!= KUKA::FRI::LBRState::NUMBER_OF_JOINTS )
+  {
+    ROS_FATAL_THROTTLE(0.5, "The iiwa tree is broken! First order kinematics cannot be updated.");
+    return false;
+  }
+  KDL::JntArray   ja = KDL::JntArray( KUKA::FRI::LBRState::NUMBER_OF_JOINTS );
   for(size_t i=0;i<KUKA::FRI::LBRState::NUMBER_OF_JOINTS;i++)
     ja(i) = jp[i];
 
@@ -710,12 +715,14 @@ bool LBRJointOverlayClient::updatetFirstOrderKinematic( )
   //////// POSE
 
   //////// JACOBIAN
-  KDL::Jacobian jac;
-  jac.resize(iiwa_chain_.getNrOfJoints());
+  KDL::Jacobian jac( KUKA::FRI::LBRState::NUMBER_OF_JOINTS  );
   jacsolver_->JntToJac (ja, jac );
 
-  assert( jac.columns() == 7 );
-  assert( jac.rows() == 6 );
+  if( jac.columns() != KUKA::FRI::LBRState::NUMBER_OF_JOINTS  || jac.rows() != 6 )
+  {
+    ROS_FATAL_THROTTLE(0.5, "The jacobian calculation is broken! First order kinematics cannot be updated. ");
+    return false;
+  }
   for(size_t i=0; i<6; i++)
     for(size_t j=0; j<7; j++)
       jacobian_(i,j) = jac(i,j);

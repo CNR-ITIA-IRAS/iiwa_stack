@@ -58,17 +58,17 @@ IIWA_HW::~IIWA_HW()
 
 bool IIWA_HW::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw_nh)
 {
+  ROS_INFO("[%s] >>> IIWA_HW Initialization started",robot_hw_nh.getNamespace().c_str());
   if (!itia_hardware_interface::BasicRobotHW::init(root_nh, robot_hw_nh))
   {
-    ROS_ERROR("[%s] IIWA_HW::init() error",robot_hw_nh.getNamespace().c_str());
+    ROS_ERROR("[%s] init() error",robot_hw_nh.getNamespace().c_str());
     return false;
   }
+  ROS_INFO("[%s] Basic Robot Initialization ok",robot_hw_nh.getNamespace().c_str());
   
   
   
   // TODO: use transmission configuration to get names directly from the URDF model
-  
-  
   if ( robot_hw_nh.getParam("fri_port", fri_port_) )
   {
     fri_port_ = -1;
@@ -82,9 +82,11 @@ bool IIWA_HW::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw_nh)
     fri_hostname_ = "n/a";
   }
 
+  ROS_INFO("[%s] iiwa ros connection initialization ",m_robot_hw_nh.getNamespace().c_str());
   iiwa_ros_conn_.init(1./control_frequency_, true);
   
   // initialize and set to zero the state and command values
+  ROS_INFO("[%s] >>> iiwa ros connection initialization ",m_robot_hw_nh.getNamespace().c_str());
   device_->init( device_->joint_names.size() );
   device_->reset( );
   
@@ -161,17 +163,19 @@ bool IIWA_HW::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw_nh)
     }
   }
   
-  ROS_INFO("Register state and effort interfaces");
-  
   // TODO: CHECK
   // register ros-controls interfaces
+  ROS_INFO("[ %s ] Register state interface",m_robot_hw_nh.getNamespace().c_str());
   this->registerInterface(&state_interface_);
+  ROS_INFO("[ %s ] Register position velocity effort interface",m_robot_hw_nh.getNamespace().c_str());
   this->registerInterface(&position_velocity_effort_interface_);
+  ROS_INFO("[ %s ] Register effort interface",m_robot_hw_nh.getNamespace().c_str());
   this->registerInterface(&effort_interface_);
+  ROS_INFO("[ %s ] Register velocity interface",m_robot_hw_nh.getNamespace().c_str());
   this->registerInterface(&velocity_interface_);
+  ROS_INFO("[ %s ] Register position interface",m_robot_hw_nh.getNamespace().c_str());
   this->registerInterface(&position_interface_);
-  
-  
+
   m_duration_send_zero_with_no_control = ros::Duration(0.1);
   m_switch_off_control_time            = ros::Time::now();
   
@@ -184,16 +188,16 @@ bool IIWA_HW::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw_nh)
 
 bool IIWA_HW::prepareSwitch(const std::list< hardware_interface::ControllerInfo >& start_list, const std::list< hardware_interface::ControllerInfo >& stop_list)
 {
+  ROS_INFO("[ %s ] Prepare Switch",m_robot_hw_nh.getNamespace().c_str());
   if(start_list.size()==0) 
   {
     if( stop_list.size()==0) 
     {
-      ROS_FATAL("NO CONTROLLERS NETIHER TO LOAD AND UNLOAD");
+      ROS_FATAL("[ %s ] NO CONTROLLERS NETIHER TO LOAD AND UNLOAD",m_robot_hw_nh.getNamespace().c_str());
     }
     else
     {
-      ROS_FATAL("NO CONTROLLERS, PUBLISHING ZERO VELOCITY FOR %f second",m_duration_send_zero_with_no_control.toSec());
-      
+      ROS_FATAL("[ %s ] NO CONTROLLERS, PUBLISHING ZERO VELOCITY FOR %f second",m_robot_hw_nh.getNamespace().c_str(),m_duration_send_zero_with_no_control.toSec());
     }
     interface_ = ROSCONTROL_NONE_INTERFACE;
     m_switch_off_control_time = ros::Time::now();
@@ -201,18 +205,18 @@ bool IIWA_HW::prepareSwitch(const std::list< hardware_interface::ControllerInfo 
   }
   else if ( start_list.size() > 1)
   {
-    ROS_FATAL("The HW allow the loading and unliading only of one controller at time");
+    ROS_FATAL("[ %s ] The HW allow the loading and unliading only of one controller at time",m_robot_hw_nh.getNamespace().c_str());
     return false;
   }
   
   if( start_list.front().claimed_resources.size() == 0 )
   {
-    ROS_FATAL("NO RESOURCES ASSOCIATED TO THE CONTROLLER");
+    ROS_FATAL("[ %s] NO RESOURCES ASSOCIATED TO THE CONTROLLER",m_robot_hw_nh.getNamespace().c_str());
     return false;
   }
   else if( start_list.front().claimed_resources.size() > 1 )
   {
-    ROS_FATAL("ONLY ONE RESOURCE AT TIME (e.g., all the joints togheter) CAN BE ASSOCIATED TO THE CONTROLLER");
+    ROS_FATAL("[ %s ] ONLY ONE RESOURCE AT TIME (e.g., all the joints togheter) CAN BE ASSOCIATED TO THE CONTROLLER",m_robot_hw_nh.getNamespace().c_str());
     return false;
   }
 
@@ -225,7 +229,7 @@ bool IIWA_HW::prepareSwitch(const std::list< hardware_interface::ControllerInfo 
   { 
     if( fri_port_ == -1 )
     {
-      ROS_ERROR("A FIR Controller is loaded, but the 'fri_port' and 'fri_hostname' are not in the parameter server. Abort. ");
+      ROS_ERROR("[ %s ]A FIR Controller is loaded, but the 'fri_port' and 'fri_hostname' are not in the parameter server. Abort. ",m_robot_hw_nh.getNamespace().c_str());
       return false;
     }
   }
@@ -273,8 +277,8 @@ bool IIWA_HW::prepareSwitch(const std::list< hardware_interface::ControllerInfo 
       ret = false;
       break;
   }
-  
-  return ret;
+  ROS_INFO("[ %s ] Prepare Switch %s",m_robot_hw_nh.getNamespace().c_str(), ( (ret) ? "SUCCESS" : "FAILURE" ) );
+  return( ret );
 }
 
 
