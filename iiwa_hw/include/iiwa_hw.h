@@ -71,7 +71,8 @@ namespace shared_ptr_namespace = boost;
 constexpr int DEFAULT_CONTROL_FREQUENCY = 1000; // Hz
 constexpr int IIWA_JOINTS = 7;
 
-namespace iiwa_hw{
+namespace iiwa_hw
+{
 
 enum IIWA_CONTROL_MODE
 {
@@ -157,6 +158,7 @@ public:
     
     geometry_msgs::WrenchStamped wrench_ee;
     geometry_msgs::WrenchStamped wrench_b;
+    geometry_msgs::PoseStamped  cartesian_pose_;
 
     /**
     * \brief Initialze vectors
@@ -256,6 +258,7 @@ private:
   std::vector<std::string> interface_type_; /**< Contains the strings defining the possible hardware interfaces. */
   std::shared_ptr< realtime_tools::RealtimePublisher< geometry_msgs::WrenchStamped > > wrench_ee_pub_;
   std::shared_ptr< realtime_tools::RealtimePublisher< geometry_msgs::WrenchStamped > > wrench_b_pub_ ;
+  std::shared_ptr< realtime_tools::RealtimePublisher< geometry_msgs::PoseStamped   > > cart_pose_pub_ ;
 };
 
 template <typename T>

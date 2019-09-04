@@ -109,8 +109,9 @@ bool IiwaHw::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw_nh)
     iiwa_control_mode_ = iiwa_control_map_.at( iiwa_control_mode );
   }
   
-  wrench_ee_pub_.reset( new realtime_tools::RealtimePublisher<geometry_msgs::WrenchStamped>(nh_, "wrench_tool", 4));
-  wrench_b_pub_ .reset( new realtime_tools::RealtimePublisher<geometry_msgs::WrenchStamped>(nh_, "wrench_base", 4));
+  wrench_ee_pub_.reset( new realtime_tools::RealtimePublisher<geometry_msgs::WrenchStamped>(nh_, "wrench_tool"   , 4));
+  wrench_b_pub_ .reset( new realtime_tools::RealtimePublisher<geometry_msgs::WrenchStamped>(nh_, "wrench_base"   , 4));
+  cart_pose_pub_.reset( new realtime_tools::RealtimePublisher<geometry_msgs::PoseStamped>  (nh_, "cartesian_pose", 4));
   
   // construct a new IIWA device (interface and state storage)
   device_.reset( new IiwaHw::IIWA_device() );
@@ -141,6 +142,7 @@ bool IiwaHw::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw_nh)
   
   ROS_INFO("Init IIWA ROS CONN (%s)", robot_hw_nh.getNamespace().c_str() );
   iiwa_ros_conn_.init(robot_hw_nh,fri_cycle_time_,true);
+  ROS_INFO("Init IIWA ROS CONN (%s) OK", robot_hw_nh.getNamespace().c_str() );
   
   switch (iiwa_control_mode_)
   {
@@ -306,6 +308,7 @@ void IiwaHw::read(const ros::Time& time, const ros::Duration& period) {
     
     iiwa_ros_conn_.getCartesianWrench(device_->wrench_ee,'e');
     iiwa_ros_conn_.getCartesianWrench(device_->wrench_b ,'b');
+    iiwa_ros_conn_.getCartesianPose(device_->cartesian_pose_);
     
     if(wrench_ee_pub_->trylock())
     {
@@ -318,6 +321,11 @@ void IiwaHw::read(const ros::Time& time, const ros::Duration& period) {
       device_->wrench_ee.header.frame_id = "iiwa_link_0";    //TODO::as params
       wrench_b_pub_->msg_ = device_->wrench_b;
       wrench_b_pub_->unlockAndPublish();
+    }
+    if(cart_pose_pub_->trylock())
+    {
+      cart_pose_pub_->msg_ = device_->cartesian_pose_;
+      cart_pose_pub_->unlockAndPublish();
     }
     
 //     for (int j = 0; j < IIWA_JOINTS; j++)

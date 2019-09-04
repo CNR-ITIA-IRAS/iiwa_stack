@@ -2,8 +2,9 @@
 <launch>
 
   <arg name="hardware_interface" default="thor"/>
-  <arg name="robot_name" default="iiwa"/>
-  <arg name="model" default="iiwa14"/>
+  <arg name="robot_name"         default="iiwa"/>
+  <arg name="model"              default="iiwa14"/>
+  <arg name="rviz"               default="true"/>
   
   <group ns="$(arg robot_name)">
     <include file="$(find iiwa_moveit)/launch/move_group.launch">
@@ -12,11 +13,12 @@
         <arg name="robot_name" value="$(arg robot_name)"/>
         <arg name="model" value="$(arg model)" />
     </include>
+    <group if="$(arg rviz)">
+      <node pkg="rviz" name="$(anon rviz)" type="rviz" respawn="false" args="-d $(find iiwa_app)/config/configuration_manager_rviz.rviz" output="screen">
+        <rosparam command="load" file="$(find iiwa_moveit)/config/kinematics.yaml"/>
+      </node>
+    </group>
     
-    <node pkg="rviz" name="$(anon rviz)" type="rviz" respawn="false" args="-d $(find iiwa_app)/config/configuration_manager_rviz.rviz" output="screen">
-      <rosparam command="load" file="$(find iiwa_moveit)/config/kinematics.yaml"/>
-    </node>
-
   </group>
   
 </launch>

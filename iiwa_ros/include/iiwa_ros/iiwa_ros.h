@@ -151,7 +151,8 @@ namespace iiwa_ros
 
   static const std::string FRI_STATE_PUBISHER_FREQ_HS_NS = "fir/state_publisher_freq_hz";
   
-  class iiwaRos {
+  class iiwaRos 
+  {
   public:
     
     /**
@@ -268,6 +269,7 @@ namespace iiwa_ros
      * 
      * @return iiwa_ros::PathParametersService
      */
+#if BACK_COMPATIBILITY_IIWA_STACK
     PathParametersService getPathParametersService() { return path_parameters_service_; }
     
     /**
@@ -276,6 +278,7 @@ namespace iiwa_ros
      * @return iiwa_ros::TimeToDestinationService
      */
     TimeToDestinationService getTimeToDestinationService() { return time_to_destination_service_; };
+#endif
     
     bool payloadInitialized() const {return payload.initializated; };
     
@@ -324,6 +327,7 @@ namespace iiwa_ros
     bool isFRIModalityActive();
     
   private:
+    #if BACK_COMPATIBILITY_IIWA_STACK
     iiwaStateHolder<geometry_msgs::PoseStamped> holder_state_pose_;
     iiwaStateHolder<iiwa_msgs::JointPosition> holder_state_joint_position_;
     iiwaStateHolder<iiwa_msgs::JointTorque> holder_state_joint_torque_;
@@ -340,9 +344,12 @@ namespace iiwa_ros
     iiwaCommandHolder<iiwa_msgs::JointVelocity> holder_command_joint_velocity_;
     iiwaCommandHolder<iiwa_msgs::JointPositionVelocity> holder_command_joint_position_velocity_;
     
-    std::shared_ptr< ServoMotion > servo_motion_service_;
     PathParametersService path_parameters_service_;
     TimeToDestinationService time_to_destination_service_;
+#endif
+    
+    std::shared_ptr< ServoMotion > servo_motion_service_;
+        
     struct Payload
     {
       enum CompensationMethod { PAYLOAD_ESTIMATION, OFFSET_ESTIMATION };

@@ -46,7 +46,8 @@ void iiwaRos::init (ros::NodeHandle &nh, double fri_cycle_time, const bool verbo
   servo_motion_service_.reset(new iiwa_ros::ServoMotion(nh));
   
   dt_ = fri_cycle_time;
-  holder_state_pose_.init ( "state/CartesianPose" );
+  
+#if BACK_COMPATIBILITY_IIWA_STACK
   holder_state_joint_position_.init ( "state/JointPosition" );
   holder_state_joint_torque_.init ( "state/JointTorque" );
   holder_state_wrench_.init ( "state/CartesianWrench" );
@@ -62,13 +63,15 @@ void iiwaRos::init (ros::NodeHandle &nh, double fri_cycle_time, const bool verbo
   holder_command_joint_position_velocity_.init ( "command/JointPositionVelocity" );
   holder_command_joint_velocity_.init ( "command/JointVelocity" );
 
-  servo_motion_service_->setServiceName ( "configuration/configureSmartServo" );
   path_parameters_service_.setServiceName ( "configuration/pathParameters" );
   time_to_destination_service_.setServiceName ( "state/timeToDestination" );
-  
-  servo_motion_service_->setVerbosity(verbosity);
   path_parameters_service_.setVerbosity(verbosity);
   time_to_destination_service_.setVerbosity(verbosity);
+#endif
+  
+  servo_motion_service_->setServiceName ( "configuration/configureSmartServo" );
+  servo_motion_service_->setVerbosity(verbosity);
+
 
   stop_fri_publisher_thread_ = false;
 
@@ -204,7 +207,11 @@ bool iiwaRos::getJointPosition ( iiwa_msgs::JointPosition& value )
 {
   if( !isFRIModalityActive() )
   {
+#if BACK_COMPATIBILITY_IIWA_STACK
     return holder_state_joint_position_.get ( value );
+#else
+    return false;
+#endif
   }
   else
   {
@@ -216,11 +223,16 @@ bool iiwaRos::getJointPosition( Eigen::Vector7d& value )
 {
   if( !isFRIModalityActive() )
   {
+#if BACK_COMPATIBILITY_IIWA_STACK
     iiwa_msgs::JointPosition jp;
     if(!holder_state_joint_position_.get ( jp ) )
       return false;
     iiwa_ros::iiwaJointPositionToEigenVector(jp,value);
     return true;
+#else
+    return false;
+#endif
+
   }
   else
   {
@@ -231,7 +243,13 @@ bool iiwaRos::getJointPosition( Eigen::Vector7d& value )
 bool iiwaRos::getJointTorque ( iiwa_msgs::JointTorque& value )
 {
   if( !isFRIModalityActive() )
+  {
+#if BACK_COMPATIBILITY_IIWA_STACK
     return holder_state_joint_torque_.get ( value );
+#else
+    return false;
+#endif
+  }
   else
   {
     return servo_motion_service_->getFRIApp( )->getFRIClient().getJointTorque(value);
@@ -242,11 +260,15 @@ bool iiwaRos::getJointTorque ( Eigen::Vector7d& value )
 {
   if( !isFRIModalityActive() )
   {
+#if BACK_COMPATIBILITY_IIWA_STACK
     iiwa_msgs::JointTorque jt;
     if(!holder_state_joint_torque_.get ( jt ) )
       return false;
     iiwa_ros::iiwaJointTorqueToEigenVector(jt,value);
     return true;
+#else
+    return false;
+#endif
   }
   else
   {
@@ -257,7 +279,13 @@ bool iiwaRos::getJointTorque ( Eigen::Vector7d& value )
 bool iiwaRos::getJointVelocity ( iiwa_msgs::JointVelocity& value )
 {
   if( !isFRIModalityActive() )
+  {
+#if BACK_COMPATIBILITY_IIWA_STACK
     return holder_state_joint_velocity_.get ( value );
+#else
+    return false;
+#endif
+  }
   else
   {
     return servo_motion_service_->getFRIApp( )->getFRIClient().getJointVelocity (value);
@@ -268,11 +296,15 @@ bool iiwaRos::getJointVelocity ( Eigen::Vector7d& value )
 {
   if( !isFRIModalityActive() )
   {
+#if BACK_COMPATIBILITY_IIWA_STACK
     iiwa_msgs::JointVelocity jv;
     if(!holder_state_joint_velocity_.get ( jv ) )
       return false;
     iiwa_ros::iiwaJointVelocityToEigenVector(jv,value);
     return true;
+#else
+    return false;
+#endif
   }
   else
   {
@@ -312,7 +344,16 @@ bool iiwaRos::getCartesianWrench (geometry_msgs::WrenchStamped& value, const cha
   Eigen::Vector6d  wrench = Eigen::Vector6d::Zero();
   if( !isFRIModalityActive() )
   {
-    ret = holder_state_wrench_.get ( value );
+#if BACK_COMPATIBILITY_IIWA_STACK
+    iiwa_msgs::JointVelocity jv;
+    if(!holder_state_joint_velocity_.get ( jv ) )
+      return false;
+    iiwa_ros::iiwaJointVelocityToEigenVector(jv,value);
+    return true;
+#else
+    return false;
+#endif
+    
   }
   else
   {
@@ -595,12 +636,20 @@ bool iiwaRos::getJacobian(Eigen::Matrix67d& value)
 
 bool iiwaRos::getJointStiffness ( iiwa_msgs::JointStiffness& value )
 {
-    return holder_state_joint_stiffness_.get ( value );
+#if BACK_COMPATIBILITY_IIWA_STACK
+  return holder_state_joint_stiffness_.get ( value );
+#else
+  return false;
+#endif
 }
 
 bool iiwaRos::getJointDamping ( iiwa_msgs::JointDamping& value )
 {
-    return holder_state_joint_damping_.get ( value );
+#if BACK_COMPATIBILITY_IIWA_STACK
+  return holder_state_joint_damping_.get ( value );
+#else
+  return false;
+#endif
 }
 
 void iiwaRos::setCartesianPose ( const geometry_msgs::PoseStamped& position )
@@ -617,12 +666,20 @@ void iiwaRos::setCartesianPose ( const geometry_msgs::PoseStamped& position )
   }
   else
   {
-    holder_command_pose_.set ( position );
-    holder_command_pose_.publishIfNew();
+    
+  #if BACK_COMPATIBILITY_IIWA_STACK
+      holder_command_pose_.set ( position );
+      holder_command_pose_.publishIfNew();
+  #else
+    return ;
+  #endif
+
   }
 #else
+#if BACK_COMPATIBILITY_IIWA_STACK
     holder_command_pose_.set ( position );
     holder_command_pose_.publishIfNew();
+#endif
 #endif
 }
 
@@ -638,20 +695,28 @@ void iiwaRos::setPayload ( const geometry_msgs::PoseStamped& position )
   {
     ROS_INFO( "setting the new payload..." );
     ROS_INFO_STREAM( " position.pose ");
+#if BACK_COMPATIBILITY_IIWA_STACK
     holder_command_payload_.set ( position );
     holder_command_payload_.publishIfNew();
     ros::Duration(3.).sleep();
+#endif
   }
   else
   {
+#if BACK_COMPATIBILITY_IIWA_STACK
     ROS_INFO( "setting the new payload..." );
     holder_command_payload_.set ( position );
     holder_command_payload_.publishIfNew();
     ros::Duration(3.).sleep();
+    #else
+    return ;
+  #endif
   }
 #else
+#if BACK_COMPATIBILITY_IIWA_STACK
     holder_command_payload_.set ( position );
     holder_command_payload_.publishIfNew();
+#endif
 #endif
 }
 
@@ -701,13 +766,22 @@ bool iiwaRos::setJointPosition ( const iiwa_msgs::JointPosition& position )
   }
   else
   {
+#if BACK_COMPATIBILITY_IIWA_STACK
     holder_command_joint_position_.set ( position );
     holder_command_joint_position_.publishIfNew();
     return true;
+#else
+    return false;
+#endif
   }
 #else
+#if BACK_COMPATIBILITY_IIWA_STACK
   holder_command_joint_position_.set ( position );
   holder_command_joint_position_.publishIfNew();
+  return true;
+#else
+  return false;
+#endif
 #endif
 
 }
@@ -724,12 +798,16 @@ void iiwaRos::setJointVelocity ( const iiwa_msgs::JointVelocity& velocity )
   }
   else
   {
+#if BACK_COMPATIBILITY_IIWA_STACK
     holder_command_joint_velocity_.set ( velocity );
     holder_command_joint_velocity_.publishIfNew();
+#endif
   }
 #else
+#if BACK_COMPATIBILITY_IIWA_STACK
   holder_command_joint_velocity_.set ( velocity );
   holder_command_joint_velocity_.publishIfNew();
+#endif
 #endif
 
 }
@@ -868,12 +946,16 @@ void iiwaRos::setJointPositionVelocity ( const iiwa_msgs::JointPositionVelocity&
   }
   else
   {
+#if BACK_COMPATIBILITY_IIWA_STACK
     holder_command_joint_position_velocity_.set ( value );
     holder_command_joint_position_velocity_.publishIfNew();
+#endif
   }
 #else
+#if BACK_COMPATIBILITY_IIWA_STACK
     holder_command_joint_position_velocity_.set ( value );
     holder_command_joint_position_velocity_.publishIfNew();
+#endif
 #endif
 }
 
