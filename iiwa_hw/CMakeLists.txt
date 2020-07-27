@@ -13,7 +13,7 @@ if( ENABLE_FRI )
 endif()
 
 find_package(catkin REQUIRED COMPONENTS
-  itia_basic_hardware_interface
+  cnr_hardware_interface
   control_toolbox
   eigen_state_space_systems
   controller_interface
@@ -50,7 +50,7 @@ include_directories(include ${Boost_INCLUDE_DIR}
 ## Declare a cpp library
 add_library(${PROJECT_NAME}
   src/iiwa_hw.cpp
-  src/iiwa_hi_nodelet.cpp
+  #src/iiwa_hi_nodelet.cpp
 )
 
 ## Add dependence to the iiwa_msg module for the library

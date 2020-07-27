@@ -4,7 +4,7 @@
 # include <nodelet/nodelet.h>
 # include <thread>
 # include <iiwa_hw.h>
-# include <itia_basic_hardware_interface/basic_hi_nodelet.h>
+# include <cnr_hardware_interface/basic_hi_nodelet.h>
 namespace itia
 {
   namespace control

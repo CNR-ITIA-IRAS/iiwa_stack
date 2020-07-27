@@ -42,8 +42,8 @@
 #include <realtime_tools/realtime_publisher.h>
 
 // ROS headers
-#include <itia_basic_hardware_interface/itia_basic_hardware_interface.h>
-#include <itia_basic_hardware_interface/posveleff_command_interface.h>
+#include <cnr_hardware_interface/cnr_robot_hw.h>
+#include <cnr_hardware_interface/posveleff_command_interface.h>
 #include <hardware_interface/posvelacc_command_interface.h>
 #include <joint_limits_interface/joint_limits.h>
 #include <joint_limits_interface/joint_limits_interface.h>
@@ -86,7 +86,7 @@ const std::map<std::string, IIWA_CONTROL_MODE> iiwa_control_map_ = {
    ,{"FRI",iiwa_hw::FRI}
 };
 
-class IiwaHw : public itia_hardware_interface::BasicRobotHW
+class IiwaHw : public cnr_hardware_interface::RobotHW
 {
 public:
   
@@ -100,7 +100,7 @@ public:
   */
   virtual ~IiwaHw();
   
-  virtual bool prepareSwitch(const std::list< hardware_interface::ControllerInfo >& start_list, const std::list< hardware_interface::ControllerInfo >& stop_list);
+  virtual bool doPrepareSwitch(const std::list< hardware_interface::ControllerInfo >& start_list, const std::list< hardware_interface::ControllerInfo >& stop_list);
 
   /**
   * \brief Initializes the IIWA device struct and all the hardware and joint limits interfaces needed.
@@ -108,16 +108,16 @@ public:
   * A joint state handle is created and linked to the current joint state of the IIWA robot.
   * A joint position handle is created and linked  to the command joint position to send to the robot.
   */
-  virtual bool init(ros::NodeHandle& root_nh, ros::NodeHandle &robot_hw_nh) ;
+  virtual bool doInit() ;
   /**
   * \brief Reads the current robot state via the IIWARos interfae and sends the values to the IIWA device struct.
   */
-  virtual void read(const ros::Time& time, const ros::Duration& period);
+  virtual bool doRead(const ros::Time& time, const ros::Duration& period);
   
   /**
   * \brief Sends the command joint position to the robot via IIWARos interface
   */
-  virtual void write(const ros::Time& time, const ros::Duration& period);
+  virtual bool doWrite(const ros::Time& time, const ros::Duration& period);
 
   /**
   * \brief Retuns the ros::Rate object to control the receiving/sending rate.

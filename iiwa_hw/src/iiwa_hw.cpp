@@ -55,54 +55,52 @@ IiwaHw::~IiwaHw()
   
 }
 
-bool IiwaHw::prepareSwitch(const std::list< hardware_interface::ControllerInfo >& start_list, const std::list< hardware_interface::ControllerInfo >& stop_list)
+bool IiwaHw::doPrepareSwitch(const std::list< hardware_interface::ControllerInfo >& start_list,
+                             const std::list< hardware_interface::ControllerInfo >& stop_list)
 {
   iiwa_ros_conn_.setWrenchOffset(1);
   return true;
 }
 
-
-ros::Rate* IiwaHw::getRate() {
+ros::Rate* IiwaHw::getRate()
+{
   return loop_rate_;
 }
 
-double IiwaHw::getFrequency() {
+double IiwaHw::getFrequency()
+{
   return control_frequency_;
 }
 
-void IiwaHw::setFrequency(double frequency) {
+void IiwaHw::setFrequency(double frequency)
+{
   control_frequency_ = frequency;
   loop_rate_ = new ros::Rate(control_frequency_);
 }
 
-bool IiwaHw::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw_nh)
+bool IiwaHw::doInit()
 {  
-  if (!itia_hardware_interface::BasicRobotHW::init(root_nh, robot_hw_nh))
-  {
-    ROS_ERROR("[%s] IiwaHw error",robot_hw_nh.getNamespace().c_str());
-    return false;
-  }
+  CNR_TRACE_START(*m_logger);
   
   loop_rate_ = new ros::Rate(control_frequency_);
-  if(!root_nh.getParam("cycle_time",fri_cycle_time_))
+  if(!m_root_nh.getParam("cycle_time",fri_cycle_time_))
   {
     fri_cycle_time_ = 0.005;
-    ROS_INFO("[%s] /fri_cycle_time param not set. usin default 0.005 s",root_nh.getNamespace().c_str());
+    CNR_INFO(*m_logger,m_root_nh.getNamespace()+"/fri_cycle_time param not set. usin default 0.005 s");
   }
   
   std::string iiwa_control_mode;
-  if(!robot_hw_nh.getParam("iiwa_control_mode",iiwa_control_mode))
+  if(!m_robothw_nh.getParam("iiwa_control_mode",iiwa_control_mode))
   {
-    ROS_ERROR("[%s] iiwa_control_mode not found on rosparam. return",robot_hw_nh.getNamespace().c_str());
+    CNR_ERROR(*m_logger, "["+ m_robothw_nh.getNamespace() +"iiwa_control_mode not found on rosparam. return");
     return false;
   }
   
-  ROS_INFO("iiwa in %s control mode",iiwa_control_mode.c_str());
+  CNR_INFO(*m_logger,"iiwa in"+ iiwa_control_mode +"control mode");
   
   if(!iiwa_control_map_.count(iiwa_control_mode))
   {
-    ROS_ERROR("[%s] does not exist. return",iiwa_control_mode.c_str());
-    return false;
+    CNR_RETURN_FALSE(*m_logger, iiwa_control_mode + "does not exist. return" );
   }
   else
   {
@@ -128,21 +126,21 @@ bool IiwaHw::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw_nh)
   // TODO: use transmission configuration to get names directly from the URDF model
   if ( ros::param::get("joints", device_->joint_names) ) {
     if ( !(device_->joint_names.size() == IIWA_JOINTS) ) {
-      ROS_ERROR("This robot has 7 joints, you must specify 7 names for each one");
+      CNR_ERROR(*m_logger, "This robot has 7 joints, you must specify 7 names for each one");
     }
   } else {
-    ROS_ERROR("No joints to be handled, ensure you load a yaml file naming the joint names this hardware interface refers to.");
-    throw std::runtime_error("No joint name specification");
+    CNR_ERROR(*m_logger, "No joints to be handled, ensure you load a yaml file naming the joint names this hardware interface refers to.");
+    CNR_RETURN_FALSE(*m_logger,"No joint name specification");
   }
   
   if (!(urdf_model_.initParam("robot_description"))) {
-    ROS_ERROR("No URDF model in the robot_description parameter, this is required to define the joint limits.");
-    throw std::runtime_error("No URDF model available");
+    CNR_ERROR(*m_logger, "No URDF model in the robot_description parameter, this is required to define the joint limits.");
+    CNR_RETURN_FALSE(*m_logger,"No URDF model available");
   }
   
-  ROS_INFO("Init IIWA ROS CONN (%s)", robot_hw_nh.getNamespace().c_str() );
-  iiwa_ros_conn_.init(robot_hw_nh,fri_cycle_time_,true);
-  ROS_INFO("Init IIWA ROS CONN (%s) OK", robot_hw_nh.getNamespace().c_str() );
+  CNR_INFO(*m_logger,"Init IIWA ROS CONN (" << m_robothw_nh.getNamespace() << ")" );
+  iiwa_ros_conn_.init(m_robothw_nh,fri_cycle_time_,true);
+  CNR_INFO(*m_logger,"Init IIWA ROS CONN (" << m_robothw_nh.getNamespace()  << ")" );
   
   switch (iiwa_control_mode_)
   {
@@ -150,7 +148,7 @@ bool IiwaHw::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw_nh)
     {
       if(!iiwa_ros_conn_.getServoMotion().setFRIJointPositionControlMode( ))
       {
-        ROS_ERROR("error in set FRI joint position control mode. return");
+        CNR_ERROR(*m_logger, "error in set FRI joint position control mode. return");
         return false;
       }
       while(!iiwa_ros_conn_.getRobotIsConnected())
@@ -178,7 +176,7 @@ bool IiwaHw::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw_nh)
     if(!joint.get()) {
       ROS_ERROR_STREAM("The specified joint "<< device_->joint_names[i] << " can't be found in the URDF model. "
       "Check that you loaded an URDF model in the robot description, or that you spelled correctly the joint name.");
-      throw std::runtime_error("Wrong joint name specification");
+      CNR_RETURN_FALSE(*m_logger,"Wrong joint name specification");
     }
     
     // joint state handle
@@ -215,19 +213,19 @@ bool IiwaHw::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw_nh)
                         &device_->joint_effort_limits[i]);
   }
   
-  ROS_INFO("Register state interface");
+  CNR_INFO(*m_logger,"Register state interface");
   this->registerInterface(&state_interface_);
-  ROS_INFO("Register effort interface");
+  CNR_INFO(*m_logger,"Register effort interface");
   this->registerInterface(&effort_interface_);
-  ROS_INFO("Register position interface");
+  CNR_INFO(*m_logger,"Register position interface");
   this->registerInterface(&position_interface_);
   // this->registerInterface(&position_interface_);
-  ROS_INFO("Register position velocity interface");
+  CNR_INFO(*m_logger,"Register position velocity interface");
   this->registerInterface(&pos_vel_interface_);
-  ROS_INFO("Register position velocity effort interface");
+  CNR_INFO(*m_logger,"Register position velocity effort interface");
   this->registerInterface(&pos_vel_eff_interface_);
     
-  return true;
+  CNR_RETURN_TRUE(*m_logger);
 }
 
 void IiwaHw::registerJointLimits(const std::string& joint_name, 
@@ -279,7 +277,9 @@ void IiwaHw::registerJointLimits(const std::string& joint_name,
   }
 }
 
-void IiwaHw::read(const ros::Time& time, const ros::Duration& period) {
+bool IiwaHw::doRead(const ros::Time& time, const ros::Duration& period)
+{
+  CNR_TRACE_START(*m_logger);
   ros::Duration delta = ros::Time::now() - timer_;
   
   static bool was_connected = false;
@@ -333,13 +333,15 @@ void IiwaHw::read(const ros::Time& time, const ros::Duration& period) {
 //                                                                  device_->joint_velocity[j], 0.2);  
       
   } else if (delta.toSec() >= 10) {
-    ROS_INFO("No LBR IIWA is connected. Waiting for the robot to connect before reading ...");
     timer_ = ros::Time::now();
-    m_status = ::itia_hardware_interface::with_error;
+    CNR_RETURN_FALSE(*m_logger, "No LBR IIWA is connected. Waiting for the robot to connect before reading ...");
   }
+  CNR_RETURN_TRUE(*m_logger);
 }
 
-void IiwaHw::write(const ros::Time& time, const ros::Duration& period) {
+bool IiwaHw::doWrite(const ros::Time& time, const ros::Duration& period)
+{
+  CNR_TRACE_START(*m_logger);
   ej_sat_interface_   .enforceLimits(period);
   ej_limits_interface_.enforceLimits(period);
   pj_sat_interface_   .enforceLimits(period);
@@ -383,10 +385,9 @@ void IiwaHw::write(const ros::Time& time, const ros::Duration& period) {
 
     
   } else if (delta.toSec() >= 10) {
-    ROS_INFO_STREAM("No LBR IIWA is connected. Waiting for the robot to connect before writing ...");
     timer_ = ros::Time::now();
-    m_status = ::itia_hardware_interface::with_error;
+    CNR_RETURN_FALSE(*m_logger, "No LBR IIWA is connected. Waiting for the robot to connect before writing ...");
   }
-  
+  CNR_RETURN_TRUE(*m_logger);
 }
 }
